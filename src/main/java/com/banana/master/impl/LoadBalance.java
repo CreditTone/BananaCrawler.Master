@@ -1,42 +1,49 @@
 package com.banana.master.impl;
 
-import java.rmi.RemoteException;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.concurrent.LinkedBlockingQueue;
 
-import com.banana.common.NodeStatus;
-import com.banana.request.BasicRequest;
-import com.banana.request.StartContext;
+import org.apache.log4j.Logger;
+
+import com.banana.common.download.IDownload;
 
 public class LoadBalance {
 	
-	//private List<RemoteDownload> downloads = new ArrayList<RemoteDownload>();
+	private static Logger logger = Logger.getLogger(LoadBalance.class);
 	
-	private List<NodeStatus> lastNodeStatus = new ArrayList<NodeStatus>();
+	private long download_interval = 0;
 	
-	private Map<String,Integer> weights = new HashMap<String,Integer>();
+	private LinkedBlockingQueue<IDownload> downloads = new LinkedBlockingQueue<IDownload>();
+	
+	private Map<IDownload,Long> downloadLastUseTime = new HashMap<IDownload,Long>();
 	
 	public LoadBalance(){
+		downloads.addAll(CrawlerMasterServer.getInstance().getAllDownload());
 	}
 	
-	public void invokeDownload(final BasicRequest finalRequest,final StartContext finalContext) {
-		
-	}
-
-	
-	protected void weightCalculating(List<NodeStatus> lastNodeStatus){
-		weights.clear();
-		for (NodeStatus ns: lastNodeStatus) {
-			double rateMemory = (double)ns.getFreeMemory()/ns.getTotalMemory();
-			int weight = (int) (rateMemory * 100);
-			weight += ns.getCpuNum() * 2;
-			weight -= ns.getActiveThread()/10;
-			if (weight < 0){
-				weight = 0;
+	public IDownload getDownload() {
+		IDownload download = null;
+		try{
+			download = downloads.take();
+			if (download != null){
+				if (download_interval > 0){
+					long lastUseTime = downloadLastUseTime.getOrDefault(download, 0L);
+					while((System.currentTimeMillis() - lastUseTime) < download_interval){
+						//等待
+					}
+				}
+				downloadLastUseTime.put(download, System.currentTimeMillis());
+				downloads.add(download);
 			}
-			weights.put(ns.getHost(),weight);
+		}catch(InterruptedException e){
+			logger.warn("", e);
 		}
+		return download;
 	}
+	
+	public void remove(IDownload download){
+		downloads.remove(download);
+	}
+	
 }

@@ -4,12 +4,15 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.log4j.Logger;
 
+import com.banana.common.PropertiesNamespace;
 import com.banana.component.DynamicEntrance;
 import com.banana.component.listener.TaskLifeListener;
 import com.banana.exception.EntranceException;
@@ -55,13 +58,18 @@ public class TaskServer implements Runnable {
 	
 	private StartContext context;
 	
+	private RemoteDownload remoteDownload = new RemoteDownload();
+	
+	private Map<String,Object> properties = new HashMap<String,Object>();
+	
 	public TaskServer(String name){
 		taskName = name;
+		properties.put(PropertiesNamespace.Task.MAX_PAGE_RETRY_COUNT, 1);
 		new Thread(this).start();
 	}
 
-	public Object getPropertie(String name) throws RemoteException {
-		return null;
+	public Map<String,Object> getProperties() throws RemoteException {
+		return properties;
 	}
 	
 	/**
@@ -225,8 +233,12 @@ public class TaskServer implements Runnable {
 			}
 			final BasicRequest finalRequest = request;
 			final StartContext finalContext  = context;
-			CrawlerMasterServer.getInstance().getLoadBalance().invokeDownload(finalRequest, finalContext);
+			remoteDownload.download(taskName, finalRequest, finalContext);
 		}
+	}
+	
+	public RemoteDownload getRemoteDownload(){
+		return remoteDownload;
 	}
 	
 	/**
