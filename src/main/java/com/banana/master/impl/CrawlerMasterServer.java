@@ -87,8 +87,6 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 		TaskServer task = tasks.get(taskName);
 		if (task != null){
 			task.pushRequests(requests);
-		}else{
-			System.out.println("not found task");
 		}
 	}
 	

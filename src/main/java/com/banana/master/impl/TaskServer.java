@@ -73,7 +73,7 @@ public class TaskServer implements Runnable {
 	}
 	
 	/**
-	 * 清除所有初始URL  
+	 * 清除所有初始URL
 	 * 在监听任务里初始化入口URL前调用该方法释放之前的入口url
 	 */
 	private void clearStartRequest(){
@@ -115,11 +115,6 @@ public class TaskServer implements Runnable {
 	public final BasicRequest poolRequest() throws InterruptedException{
 		BasicRequest req = null;
 		while (true) {
-			
-//			if(看看download积压link的数量有没有达到阈值（每个download设置阈值）){
-//				Thread.sleep(100);
-//				continue;//等待有线程可以工作
-//			}
 			if ((!requestQueue.isEmpty() || !isSingleStartFinished())) {
 				req = requestQueue.poll();
 				if (req != null)
