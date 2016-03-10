@@ -20,7 +20,6 @@ import com.banana.queue.BlockingRequestQueue;
 import com.banana.queue.RequestPriorityBlockingQueue;
 import com.banana.request.BasicRequest;
 import com.banana.request.StartContext;
-import com.banana.request.PageRequest.PageEncoding;
 
 public class TaskServer implements Runnable {
 	
@@ -65,11 +64,14 @@ public class TaskServer implements Runnable {
 	public TaskServer(String name){
 		taskName = name;
 		properties.put(PropertiesNamespace.Task.MAX_PAGE_RETRY_COUNT, 1);
-		new Thread(this).start();
 	}
 
 	public Map<String,Object> getProperties() throws RemoteException {
 		return properties;
+	}
+	
+	public void setRequestQueue(BlockingRequestQueue queue){
+		this.requestQueue = queue;
 	}
 	
 	/**
@@ -249,9 +251,6 @@ public class TaskServer implements Runnable {
 				e.printStackTrace();
 			}
 		}
-		
-		//spider.destoryCrawTask(taskName);//销毁任务
-		
 		//任务生命周期回调
 		if(taskLifeListener != null){
 			taskLifeListener.onFinished(this.taskName);

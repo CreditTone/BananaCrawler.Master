@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Task name="test">
+	<Queue type="DelayedPriorityBlockingQueue">
+		<DelayInMilliseconds>1000</DelayInMilliseconds>
+	</Queue>
+	<StartContext>
+		<PageRequest processor="listProcessor">
+			<Url>http://www.zxysz.com/archives/category/khp</Url>
+		</PageRequest>
+	</StartContext>
+	<PageProcessor name="listProcessor">
+		<Process>
+			<CrawlData>
+				<Parse key="subject">
+					<Xpath>title</Xpath>					
+				</Parse>
+				<Array key="movies">
+					<Root>
+						<Xpath>li.p-item</Xpath>
+					</Root>
+					<Parse key="img">
+						<Xpath attr="file">img.sl_lazyimg</Xpath>					
+					</Parse>
+					<Parse key="title">
+						<Xpath attr="alt">img.sl_lazyimg</Xpath>					
+					</Parse>
+					<Parse key="date">
+						<Pattern>更新于 ([\\d\\-]+)</Pattern>					
+					</Parse>
+				</Array>
+			</CrawlData>
+			<PageRequest processor="listProcessor">
+				<ParseUrl>
+					<Xpath attr="href">a[class=next page-numbers]</Xpath>
+				</ParseUrl>
+			</PageRequest>
+			<Requests processor="moveProcessor">
+				<Root>
+					<Xpath>li.p-item</Xpath>
+				</Root>
+				<PageRequest>
+					<ParseUrl>
+						<Xpath attr="href">a[class=thumb-outer]</Xpath>
+					</ParseUrl>
+				</PageRequest>
+			</Requests>
+		</Process>
+	</PageProcessor>
+	<PageProcessor name="movieProcessor">
+		<CrawlData>
+			<Parse key="moveName">
+				<Xpath>div[class=entry-title title]</Xpath>					
+			</Parse>
+			<Parse key="movieVersion">
+				<Xpath>p.name</Xpath>					
+			</Parse>
+		</CrawlData>
+	</PageProcessor>
+</Task>

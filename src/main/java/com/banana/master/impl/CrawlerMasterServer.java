@@ -1,29 +1,43 @@
 package com.banana.master.impl;
 
-import java.io.IOException;
-import java.net.MalformedURLException;
 import java.rmi.Naming;
-import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+
 import org.apache.log4j.Logger;
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.jdom2.input.SAXBuilder;
 
 import com.banana.common.NodeStatus;
 import com.banana.common.download.IDownload;
 import com.banana.common.master.ICrawlerMasterServer;
+import com.banana.component.config.XmlConfigPageProcessor;
+import com.banana.queue.DelayedBlockingQueue;
+import com.banana.queue.DelayedPriorityBlockingQueue;
+import com.banana.queue.RequestPriorityBlockingQueue;
+import com.banana.queue.SimpleBlockingQueue;
 import com.banana.request.BasicRequest;
+import com.banana.request.PageRequest;
+import com.banana.request.StartContext;
 import com.banana.util.PatternUtil;
 
 public final class CrawlerMasterServer extends UnicastRemoteObject implements ICrawlerMasterServer,Runnable {
 	
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
+
 	private static Logger logger = Logger.getLogger(CrawlerMasterServer.class);
+	
+	public static final String PREFIX = "_PAGEPROCESSOR_";
 	
 	private static CrawlerMasterServer master = null;
 	
@@ -70,7 +84,58 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 		}
 	}
 
-	public void startTask() {
+	public void startTask(String xmlConfig) throws RemoteException {
+		TaskServer taskServer = null;
+		try{
+			SAXBuilder builder = new SAXBuilder();
+			Document document = builder.build(xmlConfig);
+			Element root = document.getRootElement();
+			String name = root.getAttributeValue("name");
+			taskServer = new TaskServer(name);
+			Element queue = root.getChild("Queue");
+			if (queue != null && queue.hasAttributes()){
+				String queueType = queue.getAttributeValue("type");
+				switch(queueType){
+				case "DelayedPriorityBlockingQueue":
+					int delayInMilliseconds = Integer.parseInt(queue.getTextTrim());
+					taskServer.setRequestQueue(new DelayedPriorityBlockingQueue(delayInMilliseconds));
+					break;
+				case "DelayedBlockingQueue":
+					delayInMilliseconds = Integer.parseInt(queue.getTextTrim());
+					taskServer.setRequestQueue(new DelayedBlockingQueue(delayInMilliseconds));
+					break;
+				case "RequestPriorityBlockingQueue":
+					taskServer.setRequestQueue(new RequestPriorityBlockingQueue());
+					break;
+				case "SimpleBlockingQueue":
+					taskServer.setRequestQueue(new SimpleBlockingQueue());
+					break;
+				}
+			}
+			
+			
+			Element seed = root.getChild("StartContext");
+			List<Element> requests = seed.getChildren("PageRequest");
+			StartContext startContext = new StartContext();
+			for (Element request : requests) {
+				PageRequest req = startContext.createPageRequest(request.getChildText("Url"), XmlConfigPageProcessor.class);
+				req.setProcessorAddress(PREFIX + name + "_" + request.getAttributeValue("processor"));
+				startContext.injectSeed(req);
+			}
+			taskServer.addStartContxt(startContext);
+			
+			List<Element> pageProcessors = root.getChildren("PageProcessor");
+			
+			
+			
+		}catch(Exception e){
+			logger.warn("启动任务失败", e);
+			throw new RemoteException(e.getMessage());
+		}finally{
+			if (taskServer != null){
+				new Thread(taskServer).start();
+			}
+		}
 		
 	}
 
