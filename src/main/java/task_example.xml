@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Task name="test">
+	<Thread>10</Thread>
+	<DownloadControl>
+		<Download>192.168.0.2</Download>
+		<Download>192.168.0.3</Download>
+	</DownloadControl>
 	<Queue type="DelayedPriorityBlockingQueue">
 		<DelayInMilliseconds>1000</DelayInMilliseconds>
 	</Queue>

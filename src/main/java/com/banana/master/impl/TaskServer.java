@@ -33,7 +33,9 @@ public class TaskServer {
 	
 	private StartContext context ;
 	
-	private Collection<RemoteDownload> remoteDownload = CrawlerMasterServer.getInstance().getAllDownload();
+	private RemoteDownload remoteDownload = new RemoteDownload();
+	
+	private List<String> downloadHosts = new ArrayList<String>();
 	
 	private Map<String,Object> properties = new HashMap<String,Object>();
 	
@@ -58,11 +60,33 @@ public class TaskServer {
 		return properties;
 	}
 	
+	public void addDownloadHost(String host){
+		downloadHosts.add(host);
+	}
+	
+	public int getDownloadCount(){
+		return downloadHosts.size();
+	}
+	
 
-	public void start(){
-		for (RemoteDownload rd : remoteDownload) {
-			
+	public void start(int thread) throws Exception{
+		if (downloadHosts.isEmpty()){
+			throw new Exception("Not set any downloader");
 		}
+		if (thread < downloadHosts.size()){
+			throw new Exception("The number of threads cannot be less than the downloader");
+		}
+		remoteDownload.setDownloads(downloadHosts);
+		int index = 0;
+		while(thread > 0){
+			remoteDownload.addDownloadThread(downloadHosts.get(index), 1);
+			thread	--;
+			index 	++;
+			if (index == downloadHosts.size()){
+				index = 0;
+			}
+		}
+		remoteDownload.startCrawl(taskName);
 	}
 	
 	public void setRequestQueue(BlockingRequestQueue queue){

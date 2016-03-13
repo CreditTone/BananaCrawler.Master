@@ -55,7 +55,7 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 	
 	private Map<String,TaskServer> tasks = new HashMap<String, TaskServer>();
 	
-	private List<RemoteDownload> downloads = new ArrayList<RemoteDownload>();
+	private Map<String,IDownload> downloads = new HashMap<String,IDownload>();
 	
 	private Map<IDownload,NodeStatus> lastNodeStatus = new HashMap<IDownload,NodeStatus>();
 	
@@ -88,21 +88,41 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 
 	public void registerDownloadNode() throws java.rmi.RemoteException {
 		try {
-			RemoteDownload rd = new RemoteDownload(getClientHost());
-			downloads.add(rd);
+			String rmiAddress = "rmi://"+getClientHost()+":1099/downloader";
+			IDownload download = (IDownload) Naming.lookup(rmiAddress);
+			downloads.put(getClientHost(), download);
 			logger.info("Downloader has been registered " + getClientHost());
 		} catch (Exception e) {
 			logger.warn("Download the registration failed", e);
 		}
 	}
+	
+	private Element validateConfig(String xmlConfig) throws Exception{
+		SAXBuilder builder = new SAXBuilder();
+		Document document = builder.build(new StringReader(xmlConfig));
+		Element root = document.getRootElement();
+		//校验线程数不能小于download实例数量
+		Element threadElement = root.getChild("Thread");
+		if (threadElement != null){
+			Element downloadControl = root.getChild("DownloadControl");
+			int downloadCount = downloads.size();
+			if (downloadControl != null){
+				downloadCount = downloadControl.getChildren("Download").size();
+			}
+			int thread = Integer.parseInt(threadElement.getTextTrim());
+			if (thread > downloadCount){
+				throw new Exception("The number of threads cannot be less than the downloader");
+			}
+		}
+		return root;
+	}
 
 	public void startTask(final String xmlConfig) throws RemoteException {
 		TaskServer taskServer = null;
 		Element root = null;
+		int threadNum = 0 ;
 		try{
-			SAXBuilder builder = new SAXBuilder();
-			Document document = builder.build(new StringReader(xmlConfig));
-			root = document.getRootElement();
+			root = validateConfig(xmlConfig);
 			final String name = root.getAttributeValue("name");
 			taskServer = new TaskServer(name);
 			Element queue = root.getChild("Queue");
@@ -134,16 +154,31 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 				startContext.injectSeed(req);
 			}
 			taskServer.setContext(startContext);
+			//配置线程数和下载主机
+			Element downloadControl = root.getChild("DownloadControl");
+			if (downloadControl != null){
+				List<Element> downloadEles = downloadControl.getChildren("Download");
+				for (Element elm : downloadEles) {
+					taskServer.addDownloadHost(elm.getTextTrim());
+				}
+			}else{
+				for (String downloadHost : downloads.keySet()) {
+					taskServer.addDownloadHost(downloadHost);
+				}
+			}
+			Element thread = root.getChild("Thread");
+			if (thread != null){
+				threadNum = Integer.parseInt(thread.getTextTrim());
+			}else{
+				threadNum = taskServer.getDownloadCount();
+			}
+			String taskKey = PrefixInfo.TASK_PREFIX + taskServer.getTaskName() + PrefixInfo.TASK_CONFIG;
+			cacheConfigXml(taskKey, xmlConfig);
+			taskServer.start(threadNum);
+			tasks.put(taskServer.getTaskName(), taskServer);
 		}catch(Exception e){
 			logger.warn("启动任务失败", e);
 			throw new RemoteException(e.getMessage());
-		}finally{
-			if (taskServer != null){
-				String taskKey = PrefixInfo.TASK_PREFIX + taskServer.getTaskName() + PrefixInfo.TASK_CONFIG;
-				cacheConfigXml(taskKey, xmlConfig);
-				taskServer.start();
-				tasks.put(taskServer.getTaskName(), taskServer);
-			}
 		}
 		
 	}
@@ -173,15 +208,6 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 		if (task != null){
 			task.pushRequests(requests);
 		}
-	}
-	
-	protected RemoteDownload getIDownload(String host){
-		for(RemoteDownload download : downloads){
-			if (download.getClientHost().equals(host)){
-				return download;
-			}
-		}
-		return null;
 	}
 	
 	public void run() {
@@ -222,10 +248,6 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 			}
 			weights.put(entry.getKey(),weight);
 		}
-	}
-	
-	public Collection<RemoteDownload> getAllDownload(){
-		return downloads;
 	}
 	
 //	public Object getStartContextAttribute(String taskName, String hashCode, String attribute) {
