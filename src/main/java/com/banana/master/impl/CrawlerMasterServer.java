@@ -1,8 +1,10 @@
 package com.banana.master.impl;
 
+import java.io.StringReader;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -15,7 +17,11 @@ import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.input.SAXBuilder;
 
+import com.banana.common.JOperator;
+import com.banana.common.JOperator.OperationJedis;
 import com.banana.common.NodeStatus;
+import com.banana.common.PrefixInfo;
+import com.banana.common.PropertiesNamespace;
 import com.banana.common.download.IDownload;
 import com.banana.common.master.ICrawlerMasterServer;
 import com.banana.component.config.XmlConfigPageProcessor;
@@ -28,6 +34,10 @@ import com.banana.request.PageRequest;
 import com.banana.request.StartContext;
 import com.banana.util.PatternUtil;
 
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
+
 public final class CrawlerMasterServer extends UnicastRemoteObject implements ICrawlerMasterServer,Runnable {
 	
 	/**
@@ -37,30 +47,35 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 
 	private static Logger logger = Logger.getLogger(CrawlerMasterServer.class);
 	
-	public static final String PREFIX = "_PAGEPROCESSOR_";
-	
 	private static CrawlerMasterServer master = null;
 	
 	private long heartCheckInterval = 1000 * 10;
 	
+	private Map<String,Object> masterProperties = new HashMap<String,Object>();
+	
 	private Map<String,TaskServer> tasks = new HashMap<String, TaskServer>();
 	
-	private Map<String,IDownload> downloads = new HashMap<String,IDownload>();
+	private List<RemoteDownload> downloads = new ArrayList<RemoteDownload>();
 	
 	private Map<IDownload,NodeStatus> lastNodeStatus = new HashMap<IDownload,NodeStatus>();
 	
 	private Map<IDownload,Integer> weights = new HashMap<IDownload,Integer>();
 	
+	private JOperator redis;
+	
 	protected CrawlerMasterServer() throws RemoteException {
 		super();
 	}
 	
-	static{
-		try {
-			master = new CrawlerMasterServer();
-		} catch (RemoteException e) {
-			e.printStackTrace();
-		}
+	public static void init(final String redisHost,final int redisPort){
+			try {
+				master = new CrawlerMasterServer();
+			} catch (RemoteException e) {
+				e.printStackTrace();
+			}
+			master.redis = JOperator.newInstance(redisHost, redisPort);
+			master.masterProperties.put(PropertiesNamespace.Master.REDIS_HOST, redisHost);
+			master.masterProperties.put(PropertiesNamespace.Master.REDIS_PORT, redisPort);
 	}
 	
 	public static CrawlerMasterServer getInstance(){
@@ -71,26 +86,24 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 		return heartCheckInterval;
 	}
 
-	public void registerDownloadNode(String rmiArress) throws java.rmi.RemoteException {
-		String[] hostAndPort = PatternUtil.getPatternGroup(Pattern.compile("rmi://([^:]+):(\\d+).*"), rmiArress);
-		logger.debug(hostAndPort[1]);
-		if (!downloads.containsKey(hostAndPort[1])){
-			try {
-				IDownload download = (IDownload) Naming.lookup(rmiArress);
-				downloads.put(hostAndPort[1], download);
-			} catch (Exception e) {
-				logger.warn("", e);
-			}
+	public void registerDownloadNode() throws java.rmi.RemoteException {
+		try {
+			RemoteDownload rd = new RemoteDownload(getClientHost());
+			downloads.add(rd);
+			logger.info("Downloader has been registered " + getClientHost());
+		} catch (Exception e) {
+			logger.warn("Download the registration failed", e);
 		}
 	}
 
-	public void startTask(String xmlConfig) throws RemoteException {
+	public void startTask(final String xmlConfig) throws RemoteException {
 		TaskServer taskServer = null;
+		Element root = null;
 		try{
 			SAXBuilder builder = new SAXBuilder();
-			Document document = builder.build(xmlConfig);
-			Element root = document.getRootElement();
-			String name = root.getAttributeValue("name");
+			Document document = builder.build(new StringReader(xmlConfig));
+			root = document.getRootElement();
+			final String name = root.getAttributeValue("name");
 			taskServer = new TaskServer(name);
 			Element queue = root.getChild("Queue");
 			if (queue != null && queue.hasAttributes()){
@@ -112,31 +125,38 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 					break;
 				}
 			}
-			
-			
 			Element seed = root.getChild("StartContext");
 			List<Element> requests = seed.getChildren("PageRequest");
 			StartContext startContext = new StartContext();
 			for (Element request : requests) {
 				PageRequest req = startContext.createPageRequest(request.getChildText("Url"), XmlConfigPageProcessor.class);
-				req.setProcessorAddress(PREFIX + name + "_" + request.getAttributeValue("processor"));
+				req.setProcessorAddress(request.getAttributeValue("processor"));
 				startContext.injectSeed(req);
 			}
-			taskServer.addStartContxt(startContext);
-			
-			List<Element> pageProcessors = root.getChildren("PageProcessor");
-			
-			
-			
+			taskServer.setContext(startContext);
 		}catch(Exception e){
 			logger.warn("启动任务失败", e);
 			throw new RemoteException(e.getMessage());
 		}finally{
 			if (taskServer != null){
-				new Thread(taskServer).start();
+				String taskKey = PrefixInfo.TASK_PREFIX + taskServer.getTaskName() + PrefixInfo.TASK_CONFIG;
+				cacheConfigXml(taskKey, xmlConfig);
+				taskServer.start();
+				tasks.put(taskServer.getTaskName(), taskServer);
 			}
 		}
 		
+	}
+	
+	public void cacheConfigXml(final String key,final String xmlConfig){
+		redis.exe(new OperationJedis<Void>() {
+
+			@Override
+			public Void operation(Jedis jedis) throws Exception {
+				jedis.set(key, xmlConfig);
+				return null;
+			}
+		});
 	}
 
 	public Object getTaskPropertie(String taskName, String propertieName) throws RemoteException {
@@ -155,28 +175,30 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 		}
 	}
 	
-	protected IDownload getIDownload(String host){
-		IDownload download = downloads.get(host);
-		if (download == null)
-			throw new NullPointerException();
-		return download;
+	protected RemoteDownload getIDownload(String host){
+		for(RemoteDownload download : downloads){
+			if (download.getClientHost().equals(host)){
+				return download;
+			}
+		}
+		return null;
 	}
 	
 	public void run() {
-		while(true){
-			for (Map.Entry<String,IDownload> entry: downloads.entrySet()) {
-				IDownload download = entry.getValue();
-				try {
-					NodeStatus ns = download.getStatus();
-					lastNodeStatus.put(download, ns);
-				} catch (RemoteException e) {
-					logger.warn("heartbeat check", e);
-					//移除download，通知所有task
-				}
-			}
-			weightCalculating();
-			sleep(heartCheckInterval);
-		}
+//		while(true){
+//			for (Map.Entry<String,IDownload> entry: downloads.entrySet()) {
+//				IDownload download = entry.getValue();
+//				try {
+//					NodeStatus ns = download.getStatus();
+//					lastNodeStatus.put(download, ns);
+//				} catch (RemoteException e) {
+//					logger.warn("heartbeat check", e);
+//					//移除download，通知所有task
+//				}
+//			}
+//			weightCalculating();
+//			sleep(heartCheckInterval);
+//		}
 	}
 	
 	private void sleep(long millis){
@@ -202,17 +224,22 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 		}
 	}
 	
-	public Collection<IDownload> getAllDownload(){
-		return downloads.values();
+	public Collection<RemoteDownload> getAllDownload(){
+		return downloads;
 	}
 	
-	public Object getStartContextAttribute(String taskName, String hashCode, String attribute) {
-		TaskServer task = tasks.get(taskName);
-		if (task != null){
-			Object value = task.getRemoteDownload().getContextAttribute(hashCode, attribute);
-			return value;
-		}
-		return null;
+//	public Object getStartContextAttribute(String taskName, String hashCode, String attribute) {
+//		TaskServer task = tasks.get(taskName);
+//		if (task != null){
+//			Object value = task.getRemoteDownload().getContextAttribute(hashCode, attribute);
+//			return value;
+//		}
+//		return null;
+//	}
+
+	@Override
+	public Object getMasterPropertie(String name) throws RemoteException {
+		return masterProperties.get(name);
 	}
 	
 }

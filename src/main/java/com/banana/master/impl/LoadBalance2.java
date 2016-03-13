@@ -8,9 +8,9 @@ import org.apache.log4j.Logger;
 
 import com.banana.common.download.IDownload;
 
-public class LoadBalance {
-	
-	private static Logger logger = Logger.getLogger(LoadBalance.class);
+public class LoadBalance2 {
+	/*
+	private static Logger logger = Logger.getLogger(LoadBalance2.class);
 	
 	private long download_interval = 0;
 	
@@ -18,7 +18,7 @@ public class LoadBalance {
 	
 	private Map<IDownload,Long> downloadLastUseTime = new HashMap<IDownload,Long>();
 	
-	public LoadBalance(){
+	public LoadBalance2(){
 		downloads.addAll(CrawlerMasterServer.getInstance().getAllDownload());
 	}
 	
@@ -45,5 +45,5 @@ public class LoadBalance {
 	public void remove(IDownload download){
 		downloads.remove(download);
 	}
-	
+	*/
 }

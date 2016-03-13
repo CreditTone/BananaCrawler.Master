@@ -12,17 +12,17 @@
 		<Process>
 			<CrawlData>
 				<Parse key="subject">
-					<Xpath>title</Xpath>					
+					<Xpath>title</Xpath>				
 				</Parse>
 				<Array key="movies">
 					<Root>
 						<Xpath>li.p-item</Xpath>
 					</Root>
 					<Parse key="img">
-						<Xpath attr="file">img.sl_lazyimg</Xpath>					
+						<Xpath attr="file">img.sl_lazyimg</Xpath>				
 					</Parse>
 					<Parse key="title">
-						<Xpath attr="alt">img.sl_lazyimg</Xpath>					
+						<Xpath attr="alt">img.sl_lazyimg</Xpath>				
 					</Parse>
 					<Parse key="date">
 						<Pattern>更新于 ([\\d\\-]+)</Pattern>					
@@ -49,7 +49,7 @@
 	<PageProcessor name="movieProcessor">
 		<CrawlData>
 			<Parse key="moveName">
-				<Xpath>div[class=entry-title title]</Xpath>					
+				<Xpath>div[class=entry-title title]</Xpath>			
 			</Parse>
 			<Parse key="movieVersion">
 				<Xpath>p.name</Xpath>					
