@@ -1,6 +1,7 @@
 package com.banana.master.impl;
 
 import java.io.StringReader;
+import java.lang.reflect.Constructor;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
@@ -25,6 +26,7 @@ import com.banana.common.PropertiesNamespace;
 import com.banana.common.download.IDownload;
 import com.banana.common.master.ICrawlerMasterServer;
 import com.banana.component.config.XmlConfigPageProcessor;
+import com.banana.queue.BlockingRequestQueue;
 import com.banana.queue.DelayedBlockingQueue;
 import com.banana.queue.DelayedPriorityBlockingQueue;
 import com.banana.queue.RequestPriorityBlockingQueue;
@@ -97,90 +99,44 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 		}
 	}
 	
-	private Element validateConfig(String xmlConfig) throws Exception{
-		SAXBuilder builder = new SAXBuilder();
-		Document document = builder.build(new StringReader(xmlConfig));
-		Element root = document.getRootElement();
-		//校验线程数不能小于download实例数量
-		Element threadElement = root.getChild("Thread");
-		if (threadElement != null){
-			Element downloadControl = root.getChild("DownloadControl");
-			int downloadCount = downloads.size();
-			if (downloadControl != null){
-				downloadCount = downloadControl.getChildren("Download").size();
-			}
-			int thread = Integer.parseInt(threadElement.getTextTrim());
-			if (thread > downloadCount){
-				throw new Exception("The number of threads cannot be less than the downloader");
-			}
-		}
-		return root;
-	}
+
 
 	public void startTask(final String xmlConfig) throws RemoteException {
 		TaskServer taskServer = null;
-		Element root = null;
-		int threadNum = 0 ;
 		try{
-			root = validateConfig(xmlConfig);
-			final String name = root.getAttributeValue("name");
-			taskServer = new TaskServer(name);
-			Element queue = root.getChild("Queue");
-			if (queue != null && queue.hasAttributes()){
-				String queueType = queue.getAttributeValue("type");
-				switch(queueType){
-				case "DelayedPriorityBlockingQueue":
-					int delayInMilliseconds = Integer.parseInt(queue.getTextTrim());
-					taskServer.setRequestQueue(new DelayedPriorityBlockingQueue(delayInMilliseconds));
-					break;
-				case "DelayedBlockingQueue":
-					delayInMilliseconds = Integer.parseInt(queue.getTextTrim());
-					taskServer.setRequestQueue(new DelayedBlockingQueue(delayInMilliseconds));
-					break;
-				case "RequestPriorityBlockingQueue":
-					taskServer.setRequestQueue(new RequestPriorityBlockingQueue());
-					break;
-				case "SimpleBlockingQueue":
-					taskServer.setRequestQueue(new SimpleBlockingQueue());
-					break;
-				}
+			XmlConfig config = XmlConfig.loadXmlConfig(xmlConfig);
+			taskServer = new TaskServer(config.getName());
+			Class queueCls = Class.forName(config.getQueueClassName());
+			BlockingRequestQueue queue = null;
+			if (config.getDelayInMilliseconds() != -1){
+				Constructor queueConstructor = queueCls.getDeclaredConstructor(Integer.class);
+				queue = (BlockingRequestQueue) queueConstructor.newInstance(config.getDelayInMilliseconds());
+			}else{
+				queue = (BlockingRequestQueue) queueCls.newInstance();
 			}
-			Element seed = root.getChild("StartContext");
-			List<Element> requests = seed.getChildren("PageRequest");
-			StartContext startContext = new StartContext();
-			for (Element request : requests) {
-				PageRequest req = startContext.createPageRequest(request.getChildText("Url"), XmlConfigPageProcessor.class);
-				req.setProcessorAddress(request.getAttributeValue("processor"));
-				startContext.injectSeed(req);
-			}
-			taskServer.setContext(startContext);
-			//配置线程数和下载主机
-			Element downloadControl = root.getChild("DownloadControl");
-			if (downloadControl != null){
-				List<Element> downloadEles = downloadControl.getChildren("Download");
-				for (Element elm : downloadEles) {
-					taskServer.addDownloadHost(elm.getTextTrim());
+			taskServer.setRequestQueue(queue);
+			taskServer.setContext(config.getStartContext());
+			if (config.getDownloadHosts() != null){
+				for (String host : config.getDownloadHosts()) {
+					taskServer.addDownloadHost(host);
 				}
 			}else{
 				for (String downloadHost : downloads.keySet()) {
 					taskServer.addDownloadHost(downloadHost);
 				}
 			}
-			Element thread = root.getChild("Thread");
-			if (thread != null){
-				threadNum = Integer.parseInt(thread.getTextTrim());
-			}else{
-				threadNum = taskServer.getDownloadCount();
-			}
 			String taskKey = PrefixInfo.TASK_PREFIX + taskServer.getTaskName() + PrefixInfo.TASK_CONFIG;
 			cacheConfigXml(taskKey, xmlConfig);
-			taskServer.start(threadNum);
+			if (config.getThread() != null){
+				taskServer.start(config.getThread());
+			}else{
+				taskServer.start(taskServer.getDownloadCount());
+			}
 			tasks.put(taskServer.getTaskName(), taskServer);
 		}catch(Exception e){
 			logger.warn("启动任务失败", e);
 			throw new RemoteException(e.getMessage());
 		}
-		
 	}
 	
 	public void cacheConfigXml(final String key,final String xmlConfig){
