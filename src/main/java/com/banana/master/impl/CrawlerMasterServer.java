@@ -32,13 +32,8 @@ import com.banana.queue.DelayedPriorityBlockingQueue;
 import com.banana.queue.RequestPriorityBlockingQueue;
 import com.banana.queue.SimpleBlockingQueue;
 import com.banana.request.BasicRequest;
-import com.banana.request.PageRequest;
-import com.banana.request.StartContext;
-import com.banana.util.PatternUtil;
 
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
 
 public final class CrawlerMasterServer extends UnicastRemoteObject implements ICrawlerMasterServer,Runnable {
 	
@@ -218,6 +213,10 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 	@Override
 	public Object getMasterPropertie(String name) throws RemoteException {
 		return masterProperties.get(name);
+	}
+	
+	public Map<String,IDownload> getDownloads(){
+		return this.downloads;
 	}
 	
 }

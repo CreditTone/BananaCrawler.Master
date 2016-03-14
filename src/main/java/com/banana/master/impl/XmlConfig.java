@@ -84,7 +84,8 @@ public class XmlConfig {
 		if (thread != null){
 			config.thread = Integer.parseInt(thread.getTextTrim());
 			//校验线程数不能小于download实例数量
-			if (config.thread < config.downloadHosts.size()){
+			int downloadCount = config.downloadHosts != null?config.downloadHosts.size():CrawlerMasterServer.getInstance().getDownloads().size();
+			if (config.thread < downloadCount){
 				throw new Exception("The number of threads cannot be less than the downloader");
 			}
 		}
