@@ -106,6 +106,9 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 			if (config.getDelayInMilliseconds() != -1){
 				Constructor queueConstructor = queueCls.getDeclaredConstructor(Integer.class);
 				queue = (BlockingRequestQueue) queueConstructor.newInstance(config.getDelayInMilliseconds());
+			}else if (config.getRedisHost() != null){
+				Constructor queueConstructor = queueCls.getDeclaredConstructor(String.class,Integer.class);
+				queue = (BlockingRequestQueue) queueConstructor.newInstance(config.getRedisHost(),config.getRedisPort());
 			}else{
 				queue = (BlockingRequestQueue) queueCls.newInstance();
 			}
@@ -158,6 +161,18 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 		TaskServer task = tasks.get(taskName);
 		if (task != null){
 			task.pushRequests(requests);
+		}
+	}
+	
+	public List<BasicRequest> pollTaskRequests(String taskName,int fetchsize) throws RemoteException {
+		TaskServer task = tasks.get(taskName);
+		try {
+			return task.pollRequest(fetchsize);
+		} catch (InterruptedException e) {
+			logger.warn("System error",e);
+			RemoteException re = new RemoteException();
+			re.addSuppressed(e.fillInStackTrace());
+			throw re;
 		}
 	}
 	

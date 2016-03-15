@@ -13,6 +13,7 @@ import org.jdom2.input.SAXBuilder;
 import com.banana.component.config.XmlConfigPageProcessor;
 import com.banana.queue.DelayedBlockingQueue;
 import com.banana.queue.DelayedPriorityBlockingQueue;
+import com.banana.queue.RedisRequestBlockingQueue;
 import com.banana.queue.RequestPriorityBlockingQueue;
 import com.banana.queue.SimpleBlockingQueue;
 import com.banana.request.PageRequest;
@@ -29,6 +30,10 @@ public class XmlConfig {
 	private String queueClassName;
 	
 	private int delayInMilliseconds = -1;
+	
+	private String 	redisHost;
+		
+	private int 	redisPort;
 	
 	private StartContext startContext;
 	
@@ -54,7 +59,10 @@ public class XmlConfig {
 			case "RequestPriorityBlockingQueue":
 				config.queueClassName = RequestPriorityBlockingQueue.class.getName();
 				break;
-			case "SimpleBlockingQueue":
+			case "RedisRequestBlockingQueue":
+				config.queueClassName = RedisRequestBlockingQueue.class.getName();
+				break;
+			default:
 				config.queueClassName = SimpleBlockingQueue.class.getName();
 				break;
 			}
@@ -120,6 +128,16 @@ public class XmlConfig {
 
 	public StartContext getStartContext() {
 		return startContext;
+	}
+
+
+	public String getRedisHost() {
+		return redisHost;
+	}
+
+
+	public int getRedisPort() {
+		return redisPort;
 	}
 	
 }

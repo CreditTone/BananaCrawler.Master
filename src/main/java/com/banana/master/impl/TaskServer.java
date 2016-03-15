@@ -73,9 +73,6 @@ public class TaskServer {
 		if (downloadHosts.isEmpty()){
 			throw new Exception("Not set any downloader");
 		}
-		if (thread < downloadHosts.size()){
-			throw new Exception("The number of threads cannot be less than the downloader");
-		}
 		remoteDownload.setDownloads(downloadHosts);
 		int index = 0;
 		while(thread > 0){

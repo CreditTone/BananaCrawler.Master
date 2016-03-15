@@ -8,6 +8,12 @@
 	<Queue type="DelayedPriorityBlockingQueue">
 		<DelayInMilliseconds>1000</DelayInMilliseconds>
 	</Queue>
+	<!-- 
+	<Queue type="RedisRequestBlockingQueue">
+		<Host>127.0.0.1</Host>
+		<Port>6379</Port>
+	</Queue> 
+	-->
 	<StartContext>
 		<PageRequest processor="listProcessor">
 			<Url>http://www.zxysz.com/archives/category/khp</Url>

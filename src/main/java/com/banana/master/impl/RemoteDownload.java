@@ -49,7 +49,7 @@ public class RemoteDownload {
 	}
 	
 	public void startCrawl(String taskName) throws RemoteException{
-		for (String downloadHost :downloads.keySet()) {
+		for (String downloadHost : downloads.keySet()) {
 			IDownload d = downloads.get(downloadHost);
 			d.newDownload(taskName, downloadThread.get(downloadHost));
 			d.startDownload(taskName);
