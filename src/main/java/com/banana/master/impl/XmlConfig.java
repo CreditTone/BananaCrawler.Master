@@ -31,10 +31,6 @@ public class XmlConfig {
 	
 	private int delayInMilliseconds = -1;
 	
-	private String 	redisHost;
-		
-	private int 	redisPort;
-	
 	private StartContext startContext;
 	
 	
@@ -130,14 +126,4 @@ public class XmlConfig {
 		return startContext;
 	}
 
-
-	public String getRedisHost() {
-		return redisHost;
-	}
-
-
-	public int getRedisPort() {
-		return redisPort;
-	}
-	
 }

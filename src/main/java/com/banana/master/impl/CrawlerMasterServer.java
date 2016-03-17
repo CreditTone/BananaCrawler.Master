@@ -29,6 +29,7 @@ import com.banana.component.config.XmlConfigPageProcessor;
 import com.banana.queue.BlockingRequestQueue;
 import com.banana.queue.DelayedBlockingQueue;
 import com.banana.queue.DelayedPriorityBlockingQueue;
+import com.banana.queue.RedisRequestBlockingQueue;
 import com.banana.queue.RequestPriorityBlockingQueue;
 import com.banana.queue.SimpleBlockingQueue;
 import com.banana.request.BasicRequest;
@@ -106,9 +107,11 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 			if (config.getDelayInMilliseconds() != -1){
 				Constructor queueConstructor = queueCls.getDeclaredConstructor(Integer.class);
 				queue = (BlockingRequestQueue) queueConstructor.newInstance(config.getDelayInMilliseconds());
-			}else if (config.getRedisHost() != null){
+			}else if (queueCls.equals(RedisRequestBlockingQueue.class)){
 				Constructor queueConstructor = queueCls.getDeclaredConstructor(String.class,Integer.class);
-				queue = (BlockingRequestQueue) queueConstructor.newInstance(config.getRedisHost(),config.getRedisPort());
+				String redisHost = (String) master.masterProperties.get(PropertiesNamespace.Master.REDIS_HOST);
+				int redisPort = (int) master.masterProperties.get(PropertiesNamespace.Master.REDIS_PORT);
+				queue = (BlockingRequestQueue) queueConstructor.newInstance(redisHost,redisPort);
 			}else{
 				queue = (BlockingRequestQueue) queueCls.newInstance();
 			}

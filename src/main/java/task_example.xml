@@ -9,10 +9,8 @@
 		<DelayInMilliseconds>1000</DelayInMilliseconds>
 	</Queue>
 	<!-- 
-	<Queue type="RedisRequestBlockingQueue">
-		<Host>127.0.0.1</Host>
-		<Port>6379</Port>
-	</Queue> 
+		<Queue type="RedisRequestBlockingQueue">
+		</Queue>
 	-->
 	<StartContext>
 		<PageRequest processor="listProcessor">
