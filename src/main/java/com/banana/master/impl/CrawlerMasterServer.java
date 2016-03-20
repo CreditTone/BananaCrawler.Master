@@ -51,7 +51,7 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 	
 	private Map<String,Object> masterProperties = new HashMap<String,Object>();
 	
-	private Map<String,TaskServer> tasks = new HashMap<String, TaskServer>();
+	private Map<String,TaskTracker> tasks = new HashMap<String, TaskTracker>();
 	
 	private Map<String,IDownload> downloads = new HashMap<String,IDownload>();
 	
@@ -98,10 +98,10 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 
 
 	public void startTask(final String xmlConfig) throws RemoteException {
-		TaskServer taskServer = null;
+		TaskTracker taskServer = null;
 		try{
 			XmlConfig config = XmlConfig.loadXmlConfig(xmlConfig);
-			taskServer = new TaskServer(config.getName());
+			taskServer = new TaskTracker(config.getName());
 			Class queueCls = Class.forName(config.getQueueClassName());
 			BlockingRequestQueue queue = null;
 			if (config.getDelayInMilliseconds() != -1){
@@ -152,7 +152,7 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 	}
 
 	public Object getTaskPropertie(String taskName, String propertieName) throws RemoteException {
-		TaskServer task = tasks.get(taskName);
+		TaskTracker task = tasks.get(taskName);
 		if (task != null){
 			Map<String,Object> properties = task.getProperties();
 			return properties.get(propertieName);
@@ -161,14 +161,14 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 	}
 
 	public void pushTaskRequests(String taskName, List<BasicRequest> requests) throws RemoteException {
-		TaskServer task = tasks.get(taskName);
+		TaskTracker task = tasks.get(taskName);
 		if (task != null){
 			task.pushRequests(requests);
 		}
 	}
 	
 	public List<BasicRequest> pollTaskRequests(String taskName,int fetchsize) throws RemoteException {
-		TaskServer task = tasks.get(taskName);
+		TaskTracker task = tasks.get(taskName);
 		try {
 			return task.pollRequest(fetchsize);
 		} catch (InterruptedException e) {

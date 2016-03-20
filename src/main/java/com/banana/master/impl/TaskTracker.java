@@ -23,9 +23,9 @@ import com.banana.queue.SimpleBlockingQueue;
 import com.banana.request.BasicRequest;
 import com.banana.request.StartContext;
 
-public class TaskServer {
+public class TaskTracker {
 	
-	private static Logger logger = Logger.getLogger(TaskServer.class);
+	private static Logger logger = Logger.getLogger(TaskTracker.class);
 	
 	private String taskName;
 	
@@ -39,7 +39,7 @@ public class TaskServer {
 	
 	private Map<String,Object> properties = new HashMap<String,Object>();
 	
-	public TaskServer(String name){
+	public TaskTracker(String name){
 		taskName = name;
 		properties.put(PropertiesNamespace.Task.MAX_PAGE_RETRY_COUNT, 1);
 	}

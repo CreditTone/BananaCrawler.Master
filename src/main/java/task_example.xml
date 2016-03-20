@@ -23,7 +23,7 @@
 				<Parse key="subject">
 					<Xpath>title</Xpath>				
 				</Parse>
-				<Array key="movies">
+				<ArrayParse key="movies">
 					<Root>
 						<Xpath>li.p-item</Xpath>
 					</Root>
@@ -36,7 +36,7 @@
 					<Parse key="date">
 						<Pattern>更新于 ([\\d\\-]+)</Pattern>					
 					</Parse>
-				</Array>
+				</ArrayParse>
 			</CrawlData>
 			<PageRequest processor="listProcessor">
 				<ParseUrl>
