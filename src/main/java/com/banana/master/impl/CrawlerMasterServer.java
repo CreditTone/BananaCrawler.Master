@@ -1,37 +1,25 @@
 package com.banana.master.impl;
 
-import java.io.StringReader;
 import java.lang.reflect.Constructor;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 
 import org.apache.log4j.Logger;
-import org.jdom2.Document;
-import org.jdom2.Element;
-import org.jdom2.input.SAXBuilder;
 
-import com.banana.common.JOperator;
-import com.banana.common.JOperator.OperationJedis;
+import com.banana.common.JedisOperator;
+import com.banana.common.JedisOperator.Command;
 import com.banana.common.NodeStatus;
 import com.banana.common.PrefixInfo;
 import com.banana.common.PropertiesNamespace;
 import com.banana.common.download.IDownload;
 import com.banana.common.master.ICrawlerMasterServer;
-import com.banana.component.config.XmlConfigPageProcessor;
 import com.banana.queue.BlockingRequestQueue;
-import com.banana.queue.DelayedBlockingQueue;
-import com.banana.queue.DelayedPriorityBlockingQueue;
 import com.banana.queue.RedisRequestBlockingQueue;
-import com.banana.queue.RequestPriorityBlockingQueue;
-import com.banana.queue.SimpleBlockingQueue;
 import com.banana.request.BasicRequest;
 
 import redis.clients.jedis.Jedis;
@@ -59,21 +47,38 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 	
 	private Map<IDownload,Integer> weights = new HashMap<IDownload,Integer>();
 	
-	private JOperator redis;
+	private JedisOperator redis;
 	
 	protected CrawlerMasterServer() throws RemoteException {
 		super();
 	}
 	
 	public static void init(final String redisHost,final int redisPort){
-			try {
-				master = new CrawlerMasterServer();
-			} catch (RemoteException e) {
-				e.printStackTrace();
+			JedisOperator jedisOperator = JedisOperator.newInstance(redisHost, redisPort);
+			Boolean success = jedisOperator.exe(new JedisOperator.Command<Boolean>() {
+
+				@Override
+				public Boolean operation(Jedis jedis) throws Exception {
+					jedis.setex("TestRedisKey", 1, "TestRedisValue");
+					return true;
+				}
+
+				@Override
+				protected void exceptionOccurs(Exception e) {
+					logger.warn("请给Master配置一个Redis服务");
+				}
+			});
+			if (success != null && success){
+				try {
+					master = new CrawlerMasterServer();
+					master.redis = jedisOperator;
+					master.masterProperties.put(PropertiesNamespace.Master.REDIS_HOST, redisHost);
+					master.masterProperties.put(PropertiesNamespace.Master.REDIS_PORT, redisPort);
+				} catch (RemoteException e) {
+					logger.warn("Initialize the master service failure",e);
+					master = null;
+				}
 			}
-			master.redis = JOperator.newInstance(redisHost, redisPort);
-			master.masterProperties.put(PropertiesNamespace.Master.REDIS_HOST, redisHost);
-			master.masterProperties.put(PropertiesNamespace.Master.REDIS_PORT, redisPort);
 	}
 	
 	public static CrawlerMasterServer getInstance(){
@@ -141,7 +146,7 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 	}
 	
 	public void cacheConfigXml(final String key,final String xmlConfig){
-		redis.exe(new OperationJedis<Void>() {
+		redis.exe(new Command<Void>() {
 
 			@Override
 			public Void operation(Jedis jedis) throws Exception {

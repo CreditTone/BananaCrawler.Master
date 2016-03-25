@@ -38,21 +38,11 @@
 					</Parse>
 				</ArrayParse>
 			</CrawlData>
-			<PageRequest processor="listProcessor">
-				<ParseUrl>
+			<PageRequest processor="listProcessor" priority="100" pageEncoding="utf-8">
+				<UrlParse>
 					<Xpath attr="href">a[class=next page-numbers]</Xpath>
-				</ParseUrl>
+				</UrlParse>
 			</PageRequest>
-			<Requests processor="moveProcessor">
-				<Root>
-					<Xpath>li.p-item</Xpath>
-				</Root>
-				<PageRequest>
-					<ParseUrl>
-						<Xpath attr="href">a[class=thumb-outer]</Xpath>
-					</ParseUrl>
-				</PageRequest>
-			</Requests>
 		</Process>
 	</PageProcessor>
 	<PageProcessor name="movieProcessor">
