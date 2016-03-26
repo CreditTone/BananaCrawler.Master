@@ -45,7 +45,7 @@ public class XmlConfig {
 			String queueType = queue.getAttributeValue("type");
 			switch(queueType){
 			case "DelayedPriorityBlockingQueue":
-				config.delayInMilliseconds = Integer.parseInt(queue.getTextTrim());
+				config.delayInMilliseconds = Integer.parseInt(queue.getChildText("DelayInMilliseconds"));
 				config.queueClassName = DelayedPriorityBlockingQueue.class.getName();
 				break;
 			case "DelayedBlockingQueue":

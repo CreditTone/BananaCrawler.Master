@@ -29,7 +29,7 @@ public class RemoteDownload {
 	public void setDownloads(List<String> downloadHost)throws MalformedURLException, RemoteException, NotBoundException{
 		downloads.clear();
 		for (String clientHost : downloadHost) {
-			String rmiAddress = "rmi://"+clientHost+":1099/downloader";
+			String rmiAddress = "rmi://"+clientHost+":1098/downloader";
 			IDownload download = (IDownload) Naming.lookup(rmiAddress);
 			downloads.put(clientHost, download);
 		}
@@ -45,10 +45,12 @@ public class RemoteDownload {
 			threadNum = 0;
 		}
 		threadNum += thread;
-		downloadThread.put(downloadHost, thread);
+		downloadThread.put(downloadHost, threadNum);
 	}
 	
 	public void startCrawl(String taskName) throws RemoteException{
+		logger.info(downloads);
+		logger.info(downloadThread);
 		for (String downloadHost : downloads.keySet()) {
 			IDownload d = downloads.get(downloadHost);
 			d.newDownloadTracker(taskName, downloadThread.get(downloadHost));

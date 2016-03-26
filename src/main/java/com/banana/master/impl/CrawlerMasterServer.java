@@ -35,17 +35,12 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 	
 	private static CrawlerMasterServer master = null;
 	
-	private long heartCheckInterval = 1000 * 10;
-	
 	private Map<String,Object> masterProperties = new HashMap<String,Object>();
 	
 	private Map<String,TaskTracker> tasks = new HashMap<String, TaskTracker>();
 	
 	private Map<String,IDownload> downloads = new HashMap<String,IDownload>();
 	
-	private Map<IDownload,NodeStatus> lastNodeStatus = new HashMap<IDownload,NodeStatus>();
-	
-	private Map<IDownload,Integer> weights = new HashMap<IDownload,Integer>();
 	
 	private JedisOperator redis;
 	
@@ -85,18 +80,15 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 		return master;
 	}
 
-	public long getHeartCheckInterval() {
-		return heartCheckInterval;
-	}
 
 	public void registerDownloadNode() throws java.rmi.RemoteException {
 		try {
-			String rmiAddress = "rmi://"+getClientHost()+":1099/downloader";
+			String rmiAddress = "rmi://"+getClientHost()+":1098/downloader";
 			IDownload download = (IDownload) Naming.lookup(rmiAddress);
 			downloads.put(getClientHost(), download);
 			logger.info("Downloader has been registered " + getClientHost());
 		} catch (Exception e) {
-			logger.warn("Download the registration failed", e);
+			logger.warn("Downloader the registration failed", e);
 		}
 	}
 	
@@ -110,10 +102,10 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 			Class queueCls = Class.forName(config.getQueueClassName());
 			BlockingRequestQueue queue = null;
 			if (config.getDelayInMilliseconds() != -1){
-				Constructor queueConstructor = queueCls.getDeclaredConstructor(Integer.class);
+				Constructor queueConstructor = queueCls.getConstructor(int.class);
 				queue = (BlockingRequestQueue) queueConstructor.newInstance(config.getDelayInMilliseconds());
 			}else if (queueCls.equals(RedisRequestBlockingQueue.class)){
-				Constructor queueConstructor = queueCls.getDeclaredConstructor(String.class,Integer.class);
+				Constructor queueConstructor = queueCls.getConstructor(String.class,int.class);
 				String redisHost = (String) master.masterProperties.get(PropertiesNamespace.Master.REDIS_HOST);
 				int redisPort = (int) master.masterProperties.get(PropertiesNamespace.Master.REDIS_PORT);
 				queue = (BlockingRequestQueue) queueConstructor.newInstance(redisHost,redisPort);
@@ -209,20 +201,6 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 		}
 	}
 	
-	protected void weightCalculating(){
-		weights.clear();
-		for (Map.Entry<IDownload, NodeStatus> entry: lastNodeStatus.entrySet()) {
-			NodeStatus ns = entry.getValue();
-			double rateMemory = (double)ns.getFreeMemory()/ns.getTotalMemory();
-			int weight = (int) (rateMemory * 100);
-			weight += ns.getCpuNum() * 2;
-			weight -= ns.getActiveThread()/10;
-			if (weight < 0){
-				weight = 0;
-			}
-			weights.put(entry.getKey(),weight);
-		}
-	}
 	
 //	public Object getStartContextAttribute(String taskName, String hashCode, String attribute) {
 //		TaskServer task = tasks.get(taskName);

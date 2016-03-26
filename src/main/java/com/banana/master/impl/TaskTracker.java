@@ -83,6 +83,8 @@ public class TaskTracker {
 				index = 0;
 			}
 		}
+		List<BasicRequest> seeds = context.getSeedRequests();
+		pushRequests(seeds);
 		remoteDownload.startCrawl(taskName);
 	}
 	
