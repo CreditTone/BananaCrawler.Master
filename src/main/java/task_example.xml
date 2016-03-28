@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Task 的name属性必须要有，定义task的名字 -->
 <Task name="test">
+	<!-- Thread配置下载线程数，不配置默认是Downloader的个数 -->
 	<Thread>10</Thread>
+	
+	<!-- DownloadControl配置下载的Downloader主机，不配置默认使用所有节点下载 -->
 	<!-- <DownloadControl>
 		<Download>192.168.0.2</Download>
 		<Download>192.168.0.3</Download>
 	</DownloadControl> -->
+	
+	
 	<Queue type="DelayedPriorityBlockingQueue">
 		<DelayInMilliseconds>1000</DelayInMilliseconds>
 	</Queue>
