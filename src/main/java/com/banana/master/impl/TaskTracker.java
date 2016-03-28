@@ -94,6 +94,7 @@ public class TaskTracker {
 	
 
 	public void pushRequests(List<BasicRequest> requests) {
+		logger.info("task "+taskName+"push requests "+requests);
 		for (BasicRequest req : requests) {
 			req.recodeRequest();
 			requestQueue.add(req);
