@@ -10,13 +10,11 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 
-import com.banana.common.download.IDownload;
-
 public class RemoteDownload {
-
+	
 	private static Logger logger = Logger.getLogger(RemoteDownload.class);
 	
-	private Map<String,IDownload> downloads = new HashMap<String,IDownload>();
+	private Map<String,Download> downloads = new HashMap<String,IDownload>();
 	
 	private Map<String,Integer> downloadThread = new HashMap<String,Integer>();
 
@@ -57,6 +55,5 @@ public class RemoteDownload {
 			d.startDownloadTracker(taskName);
 		}
 	}
-	
 	
 }

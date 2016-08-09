@@ -1,4 +1,4 @@
-package com.banana.master.impl;
+package com.banana.master.main;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -10,14 +10,16 @@ import org.jdom2.Element;
 import org.jdom2.JDOMException;
 import org.jdom2.input.SAXBuilder;
 
-import com.banana.component.config.XmlConfigPageProcessor;
-import com.banana.queue.DelayedBlockingQueue;
-import com.banana.queue.DelayedPriorityBlockingQueue;
-import com.banana.queue.RedisRequestBlockingQueue;
-import com.banana.queue.RequestPriorityBlockingQueue;
-import com.banana.queue.SimpleBlockingQueue;
-import com.banana.request.PageRequest;
-import com.banana.request.StartContext;
+import com.banana.master.impl.CrawlerMasterServer;
+
+import banana.standalone.component.config.XmlConfigPageProcessor;
+import banana.standalone.queue.DelayedBlockingQueue;
+import banana.standalone.queue.DelayedPriorityBlockingQueue;
+import banana.standalone.queue.RedisRequestBlockingQueue;
+import banana.standalone.queue.RequestPriorityBlockingQueue;
+import banana.standalone.queue.SimpleBlockingQueue;
+import banana.standalone.request.PageRequest;
+import banana.standalone.request.StartContext;
 
 public class XmlConfig {
 	

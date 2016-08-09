@@ -1,6 +1,7 @@
 package com.banana.master.impl;
 
 import java.lang.reflect.Constructor;
+import java.net.InetSocketAddress;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
@@ -8,23 +9,24 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.shell.CopyCommands.Get;
+import org.apache.hadoop.ipc.RPC;
 import org.apache.log4j.Logger;
 
-import com.banana.common.JedisOperator;
-import com.banana.common.JedisOperator.Command;
-import com.banana.common.NodeStatus;
-import com.banana.common.PrefixInfo;
-import com.banana.common.PropertiesNamespace;
-import com.banana.common.download.IDownload;
-import com.banana.common.master.ICrawlerMasterServer;
-import com.banana.queue.BlockingRequestQueue;
-import com.banana.queue.RedisRequestBlockingQueue;
-import com.banana.request.BasicRequest;
-
+import banana.standalone.common.JedisOperator;
+import banana.standalone.common.PrefixInfo;
+import banana.standalone.common.PropertiesNamespace;
+import banana.standalone.common.JedisOperator.Command;
+import banana.standalone.common.protocol.CrawlerMasterProtocol;
+import banana.standalone.common.protocol.DownloadProtocol;
+import banana.standalone.exception.CrawlerMasterException;
+import banana.standalone.queue.BlockingRequestQueue;
+import banana.standalone.queue.RedisRequestBlockingQueue;
+import banana.standalone.request.BasicRequest;
 import redis.clients.jedis.Jedis;
 
-public final class CrawlerMasterServer extends UnicastRemoteObject implements ICrawlerMasterServer,Runnable {
+public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	
 	/**
 	 * 
@@ -39,7 +41,7 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 	
 	private Map<String,TaskTracker> tasks = new HashMap<String, TaskTracker>();
 	
-	private Map<String,IDownload> downloads = new HashMap<String,IDownload>();
+	private Map<String,DownloadProtocol> downloads = new HashMap<String,DownloadProtocol>();
 	
 	
 	private JedisOperator redis;
@@ -81,12 +83,11 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 	}
 
 
-	public void registerDownloadNode() throws java.rmi.RemoteException {
+	public void registerDownloadNode(String remote) throws CrawlerMasterException {
 		try {
-			String rmiAddress = "rmi://"+getClientHost()+":1098/downloader";
-			IDownload download = (IDownload) Naming.lookup(rmiAddress);
-			downloads.put(getClientHost(), download);
-			logger.info("Downloader has been registered " + getClientHost());
+			DownloadProtocol dp = RPC.getProxy(DownloadProtocol.class, DownloadProtocol.versionID, new InetSocketAddress(remote,8787),new Configuration());
+			downloads.put(remote, dp);
+			logger.info("Downloader has been registered " + remote);
 		} catch (Exception e) {
 			logger.warn("Downloader the registration failed", e);
 		}
@@ -94,59 +95,59 @@ public final class CrawlerMasterServer extends UnicastRemoteObject implements IC
 	
 
 
-	public void startTask(final String xmlConfig) throws RemoteException {
-		TaskTracker taskServer = null;
-		try{
-			XmlConfig config = XmlConfig.loadXmlConfig(xmlConfig);
-			taskServer = new TaskTracker(config.getName());
-			Class queueCls = Class.forName(config.getQueueClassName());
-			BlockingRequestQueue queue = null;
-			if (config.getDelayInMilliseconds() != -1){
-				Constructor queueConstructor = queueCls.getConstructor(int.class);
-				queue = (BlockingRequestQueue) queueConstructor.newInstance(config.getDelayInMilliseconds());
-			}else if (queueCls.equals(RedisRequestBlockingQueue.class)){
-				Constructor queueConstructor = queueCls.getConstructor(String.class,int.class);
-				String redisHost = (String) master.masterProperties.get(PropertiesNamespace.Master.REDIS_HOST);
-				int redisPort = (int) master.masterProperties.get(PropertiesNamespace.Master.REDIS_PORT);
-				queue = (BlockingRequestQueue) queueConstructor.newInstance(redisHost,redisPort);
-			}else{
-				queue = (BlockingRequestQueue) queueCls.newInstance();
-			}
-			taskServer.setRequestQueue(queue);
-			taskServer.setContext(config.getStartContext());
-			if (config.getDownloadHosts() != null){
-				for (String host : config.getDownloadHosts()) {
-					taskServer.addDownloadHost(host);
-				}
-			}else{
-				for (String downloadHost : downloads.keySet()) {
-					taskServer.addDownloadHost(downloadHost);
-				}
-			}
-			String taskKey = PrefixInfo.TASK_PREFIX + taskServer.getTaskName() + PrefixInfo.TASK_CONFIG;
-			cacheConfigXml(taskKey, xmlConfig);
-			if (config.getThread() != null){
-				taskServer.start(config.getThread());
-			}else{
-				taskServer.start(taskServer.getDownloadCount());
-			}
-			tasks.put(taskServer.getTaskName(), taskServer);
-		}catch(Exception e){
-			logger.warn("启动任务失败", e);
-			throw new RemoteException(e.getMessage());
-		}
-	}
-	
-	public void cacheConfigXml(final String key,final String xmlConfig){
-		redis.exe(new Command<Void>() {
-
-			@Override
-			public Void operation(Jedis jedis) throws Exception {
-				jedis.set(key, xmlConfig);
-				return null;
-			}
-		});
-	}
+//	public void startTask(final String xmlConfig) throws RemoteException {
+//		TaskTracker taskServer = null;
+//		try{
+//			XmlConfig config = XmlConfig.loadXmlConfig(xmlConfig);
+//			taskServer = new TaskTracker(config.getName());
+//			Class queueCls = Class.forName(config.getQueueClassName());
+//			BlockingRequestQueue queue = null;
+//			if (config.getDelayInMilliseconds() != -1){
+//				Constructor queueConstructor = queueCls.getConstructor(int.class);
+//				queue = (BlockingRequestQueue) queueConstructor.newInstance(config.getDelayInMilliseconds());
+//			}else if (queueCls.equals(RedisRequestBlockingQueue.class)){
+//				Constructor queueConstructor = queueCls.getConstructor(String.class,int.class);
+//				String redisHost = (String) master.masterProperties.get(PropertiesNamespace.Master.REDIS_HOST);
+//				int redisPort = (int) master.masterProperties.get(PropertiesNamespace.Master.REDIS_PORT);
+//				queue = (BlockingRequestQueue) queueConstructor.newInstance(redisHost,redisPort);
+//			}else{
+//				queue = (BlockingRequestQueue) queueCls.newInstance();
+//			}
+//			taskServer.setRequestQueue(queue);
+//			taskServer.setContext(config.getStartContext());
+//			if (config.getDownloadHosts() != null){
+//				for (String host : config.getDownloadHosts()) {
+//					taskServer.addDownloadHost(host);
+//				}
+//			}else{
+//				for (String downloadHost : downloads.keySet()) {
+//					taskServer.addDownloadHost(downloadHost);
+//				}
+//			}
+//			String taskKey = PrefixInfo.TASK_PREFIX + taskServer.getTaskName() + PrefixInfo.TASK_CONFIG;
+//			cacheConfigXml(taskKey, xmlConfig);
+//			if (config.getThread() != null){
+//				taskServer.start(config.getThread());
+//			}else{
+//				taskServer.start(taskServer.getDownloadCount());
+//			}
+//			tasks.put(taskServer.getTaskName(), taskServer);
+//		}catch(Exception e){
+//			logger.warn("启动任务失败", e);
+//			throw new RemoteException(e.getMessage());
+//		}
+//	}
+//	
+//	public void cacheConfigXml(final String key,final String xmlConfig){
+//		redis.exe(new Command<Void>() {
+//
+//			@Override
+//			public Void operation(Jedis jedis) throws Exception {
+//				jedis.set(key, xmlConfig);
+//				return null;
+//			}
+//		});
+//	}
 
 	public Object getTaskPropertie(String taskName, String propertieName) throws RemoteException {
 		TaskTracker task = tasks.get(taskName);

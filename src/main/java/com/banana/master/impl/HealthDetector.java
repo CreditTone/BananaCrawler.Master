@@ -9,12 +9,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+
+import banana.standalone.common.NodeStatus;
+import banana.standalone.common.protocol.IDownload;
+
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
-
-import com.banana.common.NodeStatus;
-import com.banana.common.download.IDownload;
 
 public class HealthDetector extends TimerTask implements Closeable{
 	

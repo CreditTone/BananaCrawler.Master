@@ -5,19 +5,19 @@ import java.rmi.RemoteException;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.banana.common.master.ICrawlerMasterServer;
+import banana.standalone.common.protocol.CrawlerMasterProtocol;
 
 public class SubmitTaskTest {
 
-	private ICrawlerMasterServer crawlerMasterServer;
+	private CrawlerMasterProtocol crawlerMasterServer;
 	
 	private String xmlConfig ;
 	
 	@Before
 	public void init(){
 		try {
-			crawlerMasterServer = (ICrawlerMasterServer) Naming.lookup("rmi://localhost:1099/master");
-			InputStream in = SubmitTaskTest.class.getClassLoader().getResourceAsStream("task_example.xml");
+			crawlerMasterServer = (CrawlerMasterProtocol) Naming.lookup("rmi://localhost:1099/master");
+			InputStream in = SubmitTaskTest.class.getClassLoader().getResourceAsStream("task_example_51job.xml");
 			byte[] data = new byte[in.available()];
 			in.read(data, 0, data.length);
 			xmlConfig = new String(data, "utf-8");

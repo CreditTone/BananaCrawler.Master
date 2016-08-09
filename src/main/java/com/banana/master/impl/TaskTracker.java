@@ -13,15 +13,15 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.log4j.Logger;
 
-import com.banana.common.PropertiesNamespace;
-import com.banana.component.DynamicEntrance;
-import com.banana.component.listener.TaskLifeListener;
-import com.banana.exception.EntranceException;
-import com.banana.queue.BlockingRequestQueue;
-import com.banana.queue.RequestPriorityBlockingQueue;
-import com.banana.queue.SimpleBlockingQueue;
-import com.banana.request.BasicRequest;
-import com.banana.request.StartContext;
+import banana.standalone.common.PropertiesNamespace;
+import banana.standalone.component.DynamicEntrance;
+import banana.standalone.component.listener.TaskLifeListener;
+import banana.standalone.exception.EntranceException;
+import banana.standalone.queue.BlockingRequestQueue;
+import banana.standalone.queue.RequestPriorityBlockingQueue;
+import banana.standalone.queue.SimpleBlockingQueue;
+import banana.standalone.request.BasicRequest;
+import banana.standalone.request.StartContext;
 
 public class TaskTracker {
 	

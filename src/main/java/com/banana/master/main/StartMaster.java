@@ -12,8 +12,9 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
-import com.banana.common.master.ICrawlerMasterServer;
 import com.banana.master.impl.CrawlerMasterServer;
+
+import banana.standalone.common.protocol.CrawlerMasterProtocol;
 
 
 public class StartMaster {
@@ -37,7 +38,7 @@ public class StartMaster {
 			redisPort = Integer.parseInt(commandLine.getOptionValue("r").split(":")[1]);
 		}
 		CrawlerMasterServer.init(redis, redisPort);
-		ICrawlerMasterServer crawlerMasterServer = CrawlerMasterServer.getInstance();
+		CrawlerMasterProtocol crawlerMasterServer = CrawlerMasterServer.getInstance();
 		if (crawlerMasterServer != null){
 			LocateRegistry.createRegistry(1099);
 			Naming.rebind("rmi://localhost:1099/master", crawlerMasterServer);
