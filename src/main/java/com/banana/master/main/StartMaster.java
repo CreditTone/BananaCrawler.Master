@@ -1,5 +1,6 @@
 package com.banana.master.main;
 
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
@@ -11,15 +12,22 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.hadoop.HadoopIllegalArgumentException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.RPC.Server;
 
 import com.banana.master.impl.CrawlerMasterServer;
 
-import banana.standalone.common.protocol.CrawlerMasterProtocol;
+import banana.core.protocol.CrawlerMasterProtocol;
+import banana.core.protocol.DownloadProtocol;
+import banana.core.util.SystemUtil;
+
 
 
 public class StartMaster {
 
-	public static void main(String[] args) throws RemoteException, MalformedURLException, ParseException {
+	public static void main(String[] args) throws ParseException, HadoopIllegalArgumentException, IOException {
 		args = (args == null || args.length == 0)?new String[]{"-h"}:args;
 		CommandLineParser parser = new BasicParser( );  
 		Options options = new Options();  
@@ -40,8 +48,11 @@ public class StartMaster {
 		CrawlerMasterServer.init(redis, redisPort);
 		CrawlerMasterProtocol crawlerMasterServer = CrawlerMasterServer.getInstance();
 		if (crawlerMasterServer != null){
-			LocateRegistry.createRegistry(1099);
-			Naming.rebind("rmi://localhost:1099/master", crawlerMasterServer);
+			String localIp = SystemUtil.getLocalIP();
+			Server server = new RPC.Builder(new Configuration()).setProtocol(DownloadProtocol.class)
+	                .setInstance(crawlerMasterServer).setBindAddress(localIp).setPort(8686)
+	                .setNumHandlers(100).build();
+	        server.start();
 			System.out.println("Master已经启动!!!你可以陆续启动Downloader来扩展集群了");
 		}
 	}

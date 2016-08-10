@@ -1,10 +1,12 @@
-package com.banana.master.impl;
+package com.banana.master.task;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.rmi.RemoteException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,15 +15,15 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.log4j.Logger;
 
-import banana.standalone.common.PropertiesNamespace;
-import banana.standalone.component.DynamicEntrance;
-import banana.standalone.component.listener.TaskLifeListener;
-import banana.standalone.exception.EntranceException;
-import banana.standalone.queue.BlockingRequestQueue;
-import banana.standalone.queue.RequestPriorityBlockingQueue;
-import banana.standalone.queue.SimpleBlockingQueue;
-import banana.standalone.request.BasicRequest;
-import banana.standalone.request.StartContext;
+import com.banana.master.RemoteDownload;
+import com.banana.master.impl.CrawlerMasterServer;
+
+import banana.core.PropertiesNamespace;
+import banana.core.queue.BlockingRequestQueue;
+import banana.core.queue.SimpleBlockingQueue;
+import banana.core.request.BasicRequest;
+import banana.core.request.StartContext;
+
 
 public class TaskTracker {
 	
@@ -29,18 +31,19 @@ public class TaskTracker {
 	
 	private String taskName;
 	
+	private String taskId;
+	
+	private List<TaskDownloader> downloads = new ArrayList<TaskDownloader>();
+	
 	private BlockingRequestQueue requestQueue = new SimpleBlockingQueue();
 	
 	private StartContext context ;
-	
-	private RemoteDownload remoteDownload = new RemoteDownload();
-	
-	private List<String> downloadHosts = new ArrayList<String>();
 	
 	private Map<String,Object> properties = new HashMap<String,Object>();
 	
 	public TaskTracker(String name){
 		taskName = name;
+		taskId = taskName + "_" + new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
 		properties.put(PropertiesNamespace.Task.MAX_PAGE_RETRY_COUNT, 1);
 	}
 
@@ -56,36 +59,19 @@ public class TaskTracker {
 		this.context = context;
 	}
 
-	public Map<String,Object> getProperties() throws RemoteException {
+	public Map<String,Object> getProperties(String propertie) {
 		return properties;
 	}
 	
-	public void addDownloadHost(String host){
-		downloadHosts.add(host);
-	}
-	
-	public int getDownloadCount(){
-		return downloadHosts.size();
-	}
-	
-
 	public void start(int thread) throws Exception{
-		if (downloadHosts.isEmpty()){
+		downloads = CrawlerMasterServer.getInstance().elect(taskId, thread);
+		if (downloads.isEmpty()){
 			throw new Exception("Not set any downloader");
-		}
-		remoteDownload.setDownloads(downloadHosts);
-		int index = 0;
-		while(thread > 0){
-			remoteDownload.addDownloadThread(downloadHosts.get(index), 1);
-			thread	--;
-			index 	++;
-			if (index == downloadHosts.size()){
-				index = 0;
-			}
 		}
 		List<BasicRequest> seeds = context.getSeedRequests();
 		pushRequests(seeds);
-		remoteDownload.startCrawl(taskName);
+		for (TaskDownloader taskDownload : downloads) {
+		}
 	}
 	
 	public void setRequestQueue(BlockingRequestQueue queue){

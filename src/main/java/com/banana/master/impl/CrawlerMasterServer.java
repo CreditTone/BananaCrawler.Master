@@ -1,29 +1,30 @@
 package com.banana.master.impl;
 
-import java.lang.reflect.Constructor;
+import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.rmi.Naming;
 import java.rmi.RemoteException;
-import java.rmi.server.UnicastRemoteObject;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.shell.CopyCommands.Get;
+import org.apache.hadoop.ipc.ProtocolSignature;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.log4j.Logger;
 
-import banana.standalone.common.JedisOperator;
-import banana.standalone.common.PrefixInfo;
-import banana.standalone.common.PropertiesNamespace;
-import banana.standalone.common.JedisOperator.Command;
-import banana.standalone.common.protocol.CrawlerMasterProtocol;
-import banana.standalone.common.protocol.DownloadProtocol;
-import banana.standalone.exception.CrawlerMasterException;
-import banana.standalone.queue.BlockingRequestQueue;
-import banana.standalone.queue.RedisRequestBlockingQueue;
-import banana.standalone.request.BasicRequest;
+import com.banana.master.RemoteDownload;
+import com.banana.master.task.TaskDownloader;
+import com.banana.master.task.TaskTracker;
+
+import banana.core.JedisOperator;
+import banana.core.PropertiesNamespace;
+import banana.core.exception.CrawlerMasterException;
+import banana.core.protocol.CrawlerMasterProtocol;
+import banana.core.protocol.DownloadProtocol;
+import banana.core.request.BasicRequest;
 import redis.clients.jedis.Jedis;
 
 public final class CrawlerMasterServer implements CrawlerMasterProtocol {
@@ -41,8 +42,7 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	
 	private Map<String,TaskTracker> tasks = new HashMap<String, TaskTracker>();
 	
-	private Map<String,DownloadProtocol> downloads = new HashMap<String,DownloadProtocol>();
-	
+	private List<RemoteDownload> downloads = new ArrayList<RemoteDownload>();
 	
 	private JedisOperator redis;
 	
@@ -78,7 +78,7 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 			}
 	}
 	
-	public static CrawlerMasterServer getInstance(){
+	public static final CrawlerMasterServer getInstance(){
 		return master;
 	}
 
@@ -86,7 +86,10 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	public void registerDownloadNode(String remote) throws CrawlerMasterException {
 		try {
 			DownloadProtocol dp = RPC.getProxy(DownloadProtocol.class, DownloadProtocol.versionID, new InetSocketAddress(remote,8787),new Configuration());
-			downloads.put(remote, dp);
+			RemoteDownload rm = new RemoteDownload();
+			rm.setDownloadProtocol(dp);
+			rm.setIp(remote);
+			downloads.add(rm);
 			logger.info("Downloader has been registered " + remote);
 		} catch (Exception e) {
 			logger.warn("Downloader the registration failed", e);
@@ -94,104 +97,29 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	}
 	
 
-
-//	public void startTask(final String xmlConfig) throws RemoteException {
-//		TaskTracker taskServer = null;
-//		try{
-//			XmlConfig config = XmlConfig.loadXmlConfig(xmlConfig);
-//			taskServer = new TaskTracker(config.getName());
-//			Class queueCls = Class.forName(config.getQueueClassName());
-//			BlockingRequestQueue queue = null;
-//			if (config.getDelayInMilliseconds() != -1){
-//				Constructor queueConstructor = queueCls.getConstructor(int.class);
-//				queue = (BlockingRequestQueue) queueConstructor.newInstance(config.getDelayInMilliseconds());
-//			}else if (queueCls.equals(RedisRequestBlockingQueue.class)){
-//				Constructor queueConstructor = queueCls.getConstructor(String.class,int.class);
-//				String redisHost = (String) master.masterProperties.get(PropertiesNamespace.Master.REDIS_HOST);
-//				int redisPort = (int) master.masterProperties.get(PropertiesNamespace.Master.REDIS_PORT);
-//				queue = (BlockingRequestQueue) queueConstructor.newInstance(redisHost,redisPort);
-//			}else{
-//				queue = (BlockingRequestQueue) queueCls.newInstance();
-//			}
-//			taskServer.setRequestQueue(queue);
-//			taskServer.setContext(config.getStartContext());
-//			if (config.getDownloadHosts() != null){
-//				for (String host : config.getDownloadHosts()) {
-//					taskServer.addDownloadHost(host);
-//				}
-//			}else{
-//				for (String downloadHost : downloads.keySet()) {
-//					taskServer.addDownloadHost(downloadHost);
-//				}
-//			}
-//			String taskKey = PrefixInfo.TASK_PREFIX + taskServer.getTaskName() + PrefixInfo.TASK_CONFIG;
-//			cacheConfigXml(taskKey, xmlConfig);
-//			if (config.getThread() != null){
-//				taskServer.start(config.getThread());
-//			}else{
-//				taskServer.start(taskServer.getDownloadCount());
-//			}
-//			tasks.put(taskServer.getTaskName(), taskServer);
-//		}catch(Exception e){
-//			logger.warn("启动任务失败", e);
-//			throw new RemoteException(e.getMessage());
-//		}
-//	}
-//	
-//	public void cacheConfigXml(final String key,final String xmlConfig){
-//		redis.exe(new Command<Void>() {
-//
-//			@Override
-//			public Void operation(Jedis jedis) throws Exception {
-//				jedis.set(key, xmlConfig);
-//				return null;
-//			}
-//		});
-//	}
-
-	public Object getTaskPropertie(String taskName, String propertieName) throws RemoteException {
+	public Object getTaskPropertie(String taskName, String propertieName) {
 		TaskTracker task = tasks.get(taskName);
 		if (task != null){
-			Map<String,Object> properties = task.getProperties();
-			return properties.get(propertieName);
+			return task.getProperties(propertieName);
 		}
 		return null;
 	}
 
-	public void pushTaskRequests(String taskName, List<BasicRequest> requests) throws RemoteException {
+	public void pushTaskRequests(String taskName, List<BasicRequest> requests) {
 		TaskTracker task = tasks.get(taskName);
 		if (task != null){
 			task.pushRequests(requests);
 		}
 	}
 	
-	public List<BasicRequest> pollTaskRequests(String taskName,int fetchsize) throws RemoteException {
+	public List<BasicRequest> pollTaskRequests(String taskName,int fetchsize) {
 		TaskTracker task = tasks.get(taskName);
 		try {
 			return task.pollRequest(fetchsize);
 		} catch (InterruptedException e) {
 			logger.warn("System error",e);
-			RemoteException re = new RemoteException();
-			re.addSuppressed(e.fillInStackTrace());
-			throw re;
 		}
-	}
-	
-	public void run() {
-//		while(true){
-//			for (Map.Entry<String,IDownload> entry: downloads.entrySet()) {
-//				IDownload download = entry.getValue();
-//				try {
-//					NodeStatus ns = download.getStatus();
-//					lastNodeStatus.put(download, ns);
-//				} catch (RemoteException e) {
-//					logger.warn("heartbeat check", e);
-//					//移除download，通知所有task
-//				}
-//			}
-//			weightCalculating();
-//			sleep(heartCheckInterval);
-//		}
+		return null;
 	}
 	
 	private void sleep(long millis){
@@ -203,22 +131,60 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	}
 	
 	
-//	public Object getStartContextAttribute(String taskName, String hashCode, String attribute) {
-//		TaskServer task = tasks.get(taskName);
-//		if (task != null){
-//			Object value = task.getRemoteDownload().getContextAttribute(hashCode, attribute);
-//			return value;
-//		}
-//		return null;
-//	}
-
 	@Override
-	public Object getMasterPropertie(String name) throws RemoteException {
+	public Object getMasterPropertie(String name) {
 		return masterProperties.get(name);
 	}
+
+	@Override
+	public long getProtocolVersion(String protocol, long clientVersion) throws IOException {
+		return CrawlerMasterProtocol.versionID;
+	}
+
+	@Override
+	public ProtocolSignature getProtocolSignature(String protocol, long clientVersion, int clientMethodsHash)
+			throws IOException {
+		return new ProtocolSignature(versionID, null);
+	}
+
+	@Override
+	public void startTask(String taskConfig) throws CrawlerMasterException {
+	}
 	
-	public Map<String,IDownload> getDownloads(){
-		return this.downloads;
+	/**
+	 * 选举Downloader LoadBalance
+	 * @param taskId
+	 * @param threadNum
+	 * @return
+	 */
+	public List<TaskDownloader> elect(String taskId,int threadNum) {
+		if (threadNum > 0 && threadNum <= 3){
+			return Arrays.asList(new TaskDownloader(threadNum, downloads.get(new Random().nextInt(downloads.size()))));
+		}
+		List<TaskDownloader> taskDownloads = new ArrayList<TaskDownloader>();
+		int[] threadNums = new int[downloads.size()];
+		while(true){
+			for (int i = 0; i < threadNums.length; i++) {
+				if (threadNum < 6){
+					threadNums[i] += threadNum;
+					threadNum = 0;
+					break;
+				}
+				threadNums[i] += 3;
+				threadNum -= 3;
+			}
+			if (threadNum == 0){
+				break;
+			}
+		}
+		for (int i = 0; i < threadNums.length; i++) {
+			if (threadNums[i] > 0){
+				taskDownloads.add(new TaskDownloader(threadNums[i], downloads.get(i)));
+			}else{
+				break;
+			}
+		}
+		return taskDownloads;
 	}
 	
 }
