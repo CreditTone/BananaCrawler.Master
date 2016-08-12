@@ -13,5 +13,7 @@ public class TaskDownloader {
 		this.owner = owner;
 	}
 	
+	public void start(){
+	}
 	
 }

@@ -24,7 +24,11 @@ import banana.core.PropertiesNamespace;
 import banana.core.exception.CrawlerMasterException;
 import banana.core.protocol.CrawlerMasterProtocol;
 import banana.core.protocol.DownloadProtocol;
+import banana.core.protocol.Task;
 import banana.core.request.BasicRequest;
+import banana.core.request.HttpRequest;
+import banana.core.request.PageRequest;
+import banana.core.request.StartContext;
 import redis.clients.jedis.Jedis;
 
 public final class CrawlerMasterServer implements CrawlerMasterProtocol {
@@ -97,23 +101,23 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	}
 	
 
-	public Object getTaskPropertie(String taskName, String propertieName) {
-		TaskTracker task = tasks.get(taskName);
+	public Object getTaskPropertie(String taskId, String propertieName) {
+		TaskTracker task = tasks.get(taskId);
 		if (task != null){
 			return task.getProperties(propertieName);
 		}
 		return null;
 	}
 
-	public void pushTaskRequests(String taskName, List<BasicRequest> requests) {
-		TaskTracker task = tasks.get(taskName);
+	public void pushTaskRequests(String taskId, List<BasicRequest> requests) {
+		TaskTracker task = tasks.get(taskId);
 		if (task != null){
 			task.pushRequests(requests);
 		}
 	}
 	
-	public List<BasicRequest> pollTaskRequests(String taskName,int fetchsize) {
-		TaskTracker task = tasks.get(taskName);
+	public List<BasicRequest> pollTaskRequests(String taskId,int fetchsize) {
+		TaskTracker task = tasks.get(taskId);
 		try {
 			return task.pollRequest(fetchsize);
 		} catch (InterruptedException e) {
@@ -129,7 +133,6 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 			e.printStackTrace();
 		}
 	}
-	
 	
 	@Override
 	public Object getMasterPropertie(String name) {
@@ -147,8 +150,34 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		return new ProtocolSignature(versionID, null);
 	}
 
-	@Override
-	public void startTask(String taskConfig) throws CrawlerMasterException {
+	public void startTask(Task config) throws Exception {
+		if (downloads.isEmpty()){
+			throw new RuntimeException("There is no downloader");
+		}
+		TaskTracker tracker = new TaskTracker(config.name);
+		StartContext context = new StartContext();
+		for (Task.Seed seed : config.seeds) {
+			PageRequest req = context.createPageRequest(seed.getUrl(), seed.getProcessor());
+			if (seed.getMethod() == null || "GET".equalsIgnoreCase(seed.getMethod())){
+				req.setMethod(HttpRequest.Method.GET);
+			}else{
+				req.setMethod(HttpRequest.Method.POST);
+				Map<String,String> params = seed.getParams();
+				for (Map.Entry<String, String> valuePair : params.entrySet()){
+					req.putParams(valuePair.getKey(), valuePair.getValue());
+				}
+			}
+			if (seed.getHeaders() != null){
+				for (Map.Entry<String, String> valuePair : seed.getHeaders().entrySet()) {
+					req.putHeader(valuePair.getKey(), valuePair.getValue());
+				}
+			}
+			context.injectSeed(req);
+		}
+		tracker.setContext(context);
+		tracker.setConfig(config);
+		tracker.start(config.thread);
+		tasks.put(tracker.getId(), tracker);
 	}
 	
 	/**

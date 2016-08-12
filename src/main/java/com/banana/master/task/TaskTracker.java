@@ -19,6 +19,7 @@ import com.banana.master.RemoteDownload;
 import com.banana.master.impl.CrawlerMasterServer;
 
 import banana.core.PropertiesNamespace;
+import banana.core.protocol.Task;
 import banana.core.queue.BlockingRequestQueue;
 import banana.core.queue.SimpleBlockingQueue;
 import banana.core.request.BasicRequest;
@@ -32,6 +33,8 @@ public class TaskTracker {
 	private String taskName;
 	
 	private String taskId;
+	
+	private Task config;
 	
 	private List<TaskDownloader> downloads = new ArrayList<TaskDownloader>();
 	
@@ -51,6 +54,14 @@ public class TaskTracker {
 		return taskName;
 	}
 	
+	public String getId(){
+		return taskId;
+	}
+	
+	public void setConfig(Task task){
+		config = task;
+	}
+	
 	public StartContext getContext() {
 		return context;
 	}
@@ -59,8 +70,11 @@ public class TaskTracker {
 		this.context = context;
 	}
 
-	public Map<String,Object> getProperties(String propertie) {
-		return properties;
+	public Object getProperties(String propertie) {
+		if (propertie == null){
+			return config;
+		}
+		return properties.get(propertie);
 	}
 	
 	public void start(int thread) throws Exception{
@@ -71,6 +85,7 @@ public class TaskTracker {
 		List<BasicRequest> seeds = context.getSeedRequests();
 		pushRequests(seeds);
 		for (TaskDownloader taskDownload : downloads) {
+			
 		}
 	}
 	
@@ -102,8 +117,6 @@ public class TaskTracker {
 		return reqs;
 	}
 	
-	
-
 	/**
 	 * 任务完成销毁任务
 	 */
