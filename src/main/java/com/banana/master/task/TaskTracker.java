@@ -5,13 +5,11 @@ import java.io.IOException;
 import java.rmi.RemoteException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.Random;
 
 import org.apache.log4j.Logger;
 
@@ -19,6 +17,7 @@ import com.banana.master.RemoteDownload;
 import com.banana.master.impl.CrawlerMasterServer;
 
 import banana.core.PropertiesNamespace;
+import banana.core.exception.DownloadException;
 import banana.core.protocol.Task;
 import banana.core.queue.BlockingRequestQueue;
 import banana.core.queue.SimpleBlockingQueue;
@@ -36,7 +35,9 @@ public class TaskTracker {
 	
 	private Task config;
 	
-	private List<TaskDownloader> downloads = new ArrayList<TaskDownloader>();
+	private int allThread;
+	
+	private List<RemoteDownloaderTracker> downloads = new ArrayList<RemoteDownloaderTracker>();
 	
 	private BlockingRequestQueue requestQueue = new SimpleBlockingQueue();
 	
@@ -79,13 +80,15 @@ public class TaskTracker {
 	
 	public void start(int thread) throws Exception{
 		downloads = CrawlerMasterServer.getInstance().elect(taskId, thread);
+		allThread = thread;
 		if (downloads.isEmpty()){
 			throw new Exception("Not set any downloader");
 		}
 		List<BasicRequest> seeds = context.getSeedRequests();
 		pushRequests(seeds);
-		for (TaskDownloader taskDownload : downloads) {
-			
+		for (RemoteDownloaderTracker taskDownload : downloads) {
+			taskDownload.setTaskTracker(this);
+			taskDownload.start();
 		}
 	}
 	
@@ -115,6 +118,50 @@ public class TaskTracker {
 			}
 		}
 		return reqs;
+	}
+	
+	public void removeRemoteDownload(String ip,int port){
+		for (int x = 0 ;x < downloads.size() ; x++) {
+			RemoteDownloaderTracker rdt = downloads.get(x);
+			if (rdt.getIp().equals(ip) && rdt.getPort() == port){
+				downloads.remove(x);
+				requestNewDownload(rdt.getWorkThread());
+				break;
+			}
+		}
+	}
+	
+	private void requestNewDownload(int diffThread){
+		List<RemoteDownload> allDownloads = CrawlerMasterServer.getInstance().getDownloads();
+		if (downloads.size() < allDownloads.size()){
+			for (int i = 0; i < allDownloads.size() * 3; i++) {
+				int index = new Random().nextInt(allDownloads.size());
+				RemoteDownload newDownloader = allDownloads.get(index);
+				if (!containDownload(newDownloader.getIp(), newDownloader.getPort())){
+					RemoteDownloaderTracker newRemoteDownloaderTracker = new RemoteDownloaderTracker(diffThread, newDownloader, this);
+					try {
+						newRemoteDownloaderTracker.start();
+						downloads.add(newRemoteDownloaderTracker);
+					} catch (DownloadException e) {
+						e.printStackTrace();
+					}
+					break;
+				}
+			}
+		}else{
+			//平均向各个DownloadTracker追加线程
+			System.out.println("平均向各个DownloadTracker追加线程");
+		}
+	}
+	
+	
+	private boolean containDownload(String ip,int port){
+		for (RemoteDownloaderTracker rdt : downloads) {
+			if (rdt.getIp().equals(ip) && rdt.getPort() == port){
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	/**

@@ -37,7 +37,7 @@ import banana.core.util.SystemUtil;
 
 public class StartMaster {
 
-	public static void main2(String[] args) throws Exception {
+	public static void main(String[] args) throws Exception {
 		args = (args == null || args.length == 0)?new String[]{"-h"}:args;
 		CommandLineParser parser = new BasicParser( );  
 		Options options = new Options();  
@@ -61,18 +61,17 @@ public class StartMaster {
 			String taskFilePath = commandLine.getOptionValue("s");
 			Task task = initOneTask(taskFilePath);
 			task.verify();
-			CrawlerMasterProtocol proxy = (CrawlerMasterProtocol) RPC.getProxy(CrawlerMasterProtocol.class,CrawlerMasterProtocol.versionID,new InetSocketAddress("localhost",8686),new Configuration());
+			CrawlerMasterProtocol proxy = (CrawlerMasterProtocol) RPC.getProxy(CrawlerMasterProtocol.class,CrawlerMasterProtocol.versionID,new InetSocketAddress("localhost",8666),new Configuration());
 			proxy.startTask(task);
 		}else{
 			CrawlerMasterServer.init(redis, redisPort);
 			CrawlerMasterProtocol crawlerMasterServer = CrawlerMasterServer.getInstance();
 			if (crawlerMasterServer != null){
-				String localIp = SystemUtil.getLocalIP();
-				Server server = new RPC.Builder(new Configuration()).setProtocol(DownloadProtocol.class)
-		                .setInstance(crawlerMasterServer).setBindAddress(localIp).setPort(8686)
+				Server server = new RPC.Builder(new Configuration()).setProtocol(CrawlerMasterProtocol.class)
+		                .setInstance(crawlerMasterServer).setBindAddress("0.0.0.0").setPort(8666)
 		                .setNumHandlers(100).build();
 		        server.start();
-				System.out.println("Master已经启动!!!你可以陆续启动Downloader来扩展集群了");
+				System.out.println("Master已经启动!!!可以陆续启动Downloader来扩展集群了");
 			}
 		}
 	}

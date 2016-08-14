@@ -16,7 +16,7 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.log4j.Logger;
 
 import com.banana.master.RemoteDownload;
-import com.banana.master.task.TaskDownloader;
+import com.banana.master.task.RemoteDownloaderTracker;
 import com.banana.master.task.TaskTracker;
 
 import banana.core.JedisOperator;
@@ -55,24 +55,24 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	}
 	
 	public static void init(final String redisHost,final int redisPort){
-			JedisOperator jedisOperator = JedisOperator.newInstance(redisHost, redisPort);
-			Boolean success = jedisOperator.exe(new JedisOperator.Command<Boolean>() {
-
-				@Override
-				public Boolean operation(Jedis jedis) throws Exception {
-					jedis.setex("TestRedisKey", 1, "TestRedisValue");
-					return true;
-				}
-
-				@Override
-				protected void exceptionOccurs(Exception e) {
-					logger.warn("请给Master配置一个Redis服务");
-				}
-			});
-			if (success != null && success){
+//			JedisOperator jedisOperator = JedisOperator.newInstance(redisHost, redisPort);
+//			Boolean success = jedisOperator.exe(new JedisOperator.Command<Boolean>() {
+//
+//				@Override
+//				public Boolean operation(Jedis jedis) throws Exception {
+//					jedis.setex("TestRedisKey", 1, "TestRedisValue");
+//					return true;
+//				}
+//
+//				@Override
+//				protected void exceptionOccurs(Exception e) {
+//					logger.warn("请给Master配置一个Redis服务");
+//				}
+//			});
+			if (true){
 				try {
 					master = new CrawlerMasterServer();
-					master.redis = jedisOperator;
+					//master.redis = jedisOperator;
 					master.masterProperties.put(PropertiesNamespace.Master.REDIS_HOST, redisHost);
 					master.masterProperties.put(PropertiesNamespace.Master.REDIS_PORT, redisPort);
 				} catch (RemoteException e) {
@@ -87,17 +87,33 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	}
 
 
-	public void registerDownloadNode(String remote) throws CrawlerMasterException {
+	public void registerDownloadNode(String remote,int port) throws CrawlerMasterException {
 		try {
-			DownloadProtocol dp = RPC.getProxy(DownloadProtocol.class, DownloadProtocol.versionID, new InetSocketAddress(remote,8787),new Configuration());
-			RemoteDownload rm = new RemoteDownload();
+			DownloadProtocol dp = RPC.getProxy(DownloadProtocol.class, DownloadProtocol.versionID, new InetSocketAddress(remote,port),new Configuration());
+			RemoteDownload rm = new RemoteDownload(remote,port);
 			rm.setDownloadProtocol(dp);
-			rm.setIp(remote);
 			downloads.add(rm);
 			logger.info("Downloader has been registered " + remote);
 		} catch (Exception e) {
 			logger.warn("Downloader the registration failed", e);
 		}
+	}
+	
+	public void removeDownloadNode(String ip,int port){
+		for (int x = 0; x < downloads.size() ;x++) {
+			RemoteDownload rd = downloads.get(x);
+			if (rd.getIp().equals(ip) && rd.getPort() == port){
+				downloads.remove(x);
+				for (TaskTracker taskTracker:tasks.values()) {
+					taskTracker.removeRemoteDownload(ip, port);
+				}
+				break;
+			}
+		}
+	}
+	
+	public List<RemoteDownload> getDownloads(){
+		return downloads;
 	}
 	
 
@@ -124,14 +140,6 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 			logger.warn("System error",e);
 		}
 		return null;
-	}
-	
-	private void sleep(long millis){
-		try {
-			Thread.sleep(millis);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
 	}
 	
 	@Override
@@ -186,11 +194,11 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	 * @param threadNum
 	 * @return
 	 */
-	public List<TaskDownloader> elect(String taskId,int threadNum) {
+	public List<RemoteDownloaderTracker> elect(String taskId,int threadNum) {
 		if (threadNum > 0 && threadNum <= 3){
-			return Arrays.asList(new TaskDownloader(threadNum, downloads.get(new Random().nextInt(downloads.size()))));
+			return Arrays.asList(new RemoteDownloaderTracker(threadNum, downloads.get(new Random().nextInt(downloads.size()))));
 		}
-		List<TaskDownloader> taskDownloads = new ArrayList<TaskDownloader>();
+		List<RemoteDownloaderTracker> taskDownloads = new ArrayList<RemoteDownloaderTracker>();
 		int[] threadNums = new int[downloads.size()];
 		while(true){
 			for (int i = 0; i < threadNums.length; i++) {
@@ -208,7 +216,7 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		}
 		for (int i = 0; i < threadNums.length; i++) {
 			if (threadNums[i] > 0){
-				taskDownloads.add(new TaskDownloader(threadNums[i], downloads.get(i)));
+				taskDownloads.add(new RemoteDownloaderTracker(threadNums[i], downloads.get(i)));
 			}else{
 				break;
 			}

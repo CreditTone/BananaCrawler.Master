@@ -3,15 +3,23 @@ package com.banana.master;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import org.apache.log4j.Logger;
+
+import com.banana.master.impl.CrawlerMasterServer;
+
 import banana.core.NodeStatus;
 import banana.core.exception.DownloadException;
 import banana.core.protocol.DownloadProtocol;
 
 public class RemoteDownload extends TimerTask{
 	
+	private static Logger logger = Logger.getLogger(RemoteDownload.class);
+	
 	private Timer timer = new Timer();
 	
-	private String ip;
+	private final String ip;
+	
+	private final int port;
 	
 	private DownloadProtocol downloadProtocol;
 	
@@ -19,16 +27,31 @@ public class RemoteDownload extends TimerTask{
 	
 	private long heartCheckPeriod = 1000 * 10;
 	
-	public RemoteDownload() {
-		timer.schedule(this, heartCheckPeriod);
+	public RemoteDownload(String ip,int port) {
+		this.ip = ip;
+		this.port = port;
+		timer.schedule(this, heartCheckPeriod, heartCheckPeriod);
+	}
+	
+
+	public String getIp() {
+		return ip;
+	}
+
+	public int getPort() {
+		return port;
 	}
 
 	@Override
 	public void run() {
 		try {
 			lastStatus = downloadProtocol.healthCheck();
-		} catch (DownloadException e) {
+			logger.info("check health for "+ ip +" info " + lastStatus);
+		} catch (Exception e) {
 			e.printStackTrace();
+			logger.info("check health failure for "+ ip);
+			timer.cancel();
+			CrawlerMasterServer.getInstance().removeDownloadNode(ip,port);
 		}
 	}
 	
@@ -42,13 +65,6 @@ public class RemoteDownload extends TimerTask{
 		return lastStatus;
 	}
 
-	public String getIp() {
-		return ip;
-	}
-
-	public void setIp(String ip) {
-		this.ip = ip;
-	}
 
 	public DownloadProtocol getDownloadProtocol() {
 		return downloadProtocol;
