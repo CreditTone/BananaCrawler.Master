@@ -88,6 +88,11 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 
 
 	public void registerDownloadNode(String remote,int port) throws CrawlerMasterException {
+		for (RemoteDownload download : downloads) {
+			if(download.getIp().equals(remote) && port == download.getPort()){
+				return;
+			}
+		}
 		try {
 			DownloadProtocol dp = RPC.getProxy(DownloadProtocol.class, DownloadProtocol.versionID, new InetSocketAddress(remote,port),new Configuration());
 			RemoteDownload rm = new RemoteDownload(remote,port);
@@ -125,17 +130,17 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		return null;
 	}
 
-	public void pushTaskRequests(String taskId, List<BasicRequest> requests) {
+	public void pushTaskRequest(String taskId, BasicRequest request) {
 		TaskTracker task = tasks.get(taskId);
 		if (task != null){
-			task.pushRequests(requests);
+			task.pushRequest(request);
 		}
 	}
 	
-	public List<BasicRequest> pollTaskRequests(String taskId,int fetchsize) {
+	public BasicRequest pollTaskRequest(String taskId) {
 		TaskTracker task = tasks.get(taskId);
 		try {
-			return task.pollRequest(fetchsize);
+			return task.pollRequest();
 		} catch (InterruptedException e) {
 			logger.warn("System error",e);
 		}
@@ -222,6 +227,15 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 			}
 		}
 		return taskDownloads;
+	}
+
+	@Override
+	public Task getConfig(String taskId) {
+		TaskTracker task = tasks.get(taskId);
+		if (task != null){
+			return task.getConfig();
+		}
+		return null;
 	}
 	
 }

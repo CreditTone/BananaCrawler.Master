@@ -46,7 +46,7 @@ public class RemoteDownload extends TimerTask{
 	public void run() {
 		try {
 			lastStatus = downloadProtocol.healthCheck();
-			logger.info("check health for "+ ip +" info " + lastStatus);
+			//logger.info("check health for "+ ip +" info " + lastStatus);
 		} catch (Exception e) {
 			e.printStackTrace();
 			logger.info("check health failure for "+ ip);

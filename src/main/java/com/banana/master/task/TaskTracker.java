@@ -63,6 +63,10 @@ public class TaskTracker {
 		config = task;
 	}
 	
+	public Task getConfig(){
+		return config;
+	}
+	
 	public StartContext getContext() {
 		return context;
 	}
@@ -80,12 +84,18 @@ public class TaskTracker {
 	
 	public void start(int thread) throws Exception{
 		downloads = CrawlerMasterServer.getInstance().elect(taskId, thread);
+		logger.info(String.format("%s 分配了%d个Downloader", taskId, downloads.size()));
+		for (RemoteDownloaderTracker rdt : downloads) {
+			logger.info(String.format("%s Downloader %s Thread %d", taskId, rdt.getIp(), rdt.getWorkThread()));
+		}
 		allThread = thread;
 		if (downloads.isEmpty()){
 			throw new Exception("Not set any downloader");
 		}
 		List<BasicRequest> seeds = context.getSeedRequests();
-		pushRequests(seeds);
+		for (BasicRequest req : seeds) {
+			pushRequest(req);
+		}
 		for (RemoteDownloaderTracker taskDownload : downloads) {
 			taskDownload.setTaskTracker(this);
 			taskDownload.start();
@@ -97,27 +107,22 @@ public class TaskTracker {
 	}
 	
 
-	public void pushRequests(List<BasicRequest> requests) {
-		logger.info("task "+taskName+"push requests "+requests);
-		for (BasicRequest req : requests) {
-			req.recodeRequest();
-			requestQueue.add(req);
-		}
+	public void pushRequest(BasicRequest request) {
+		logger.info(taskName+" push requests " + request);
+		request.recodeRequest();
+		requestQueue.add(request);
 	}
 	
 
-	public final List<BasicRequest> pollRequest(int fetchsize) throws InterruptedException{
-		List<BasicRequest> reqs = new ArrayList<BasicRequest>();
-		while (true) {
-			BasicRequest req = requestQueue.poll();
-			if (req == null)
+	public final BasicRequest pollRequest() throws InterruptedException{
+		BasicRequest req = null;
+		for (int i = 0; i < 3; i++) {
+			req = requestQueue.poll();
+			if (req != null)
 				break;
-			reqs.add(req);
-			if (reqs.size() >= fetchsize){
-				break;
-			}
+			Thread.sleep(100);
 		}
-		return reqs;
+		return req;
 	}
 	
 	public void removeRemoteDownload(String ip,int port){

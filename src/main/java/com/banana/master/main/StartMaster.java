@@ -33,18 +33,16 @@ import banana.core.protocol.DownloadProtocol;
 import banana.core.protocol.Task;
 import banana.core.util.SystemUtil;
 
-
-
 public class StartMaster {
 
 	public static void main(String[] args) throws Exception {
-		args = (args == null || args.length == 0)?new String[]{"-h"}:args;
+		args = (args == null || args.length == 0)?new String[]{}:args;
 		CommandLineParser parser = new BasicParser( );  
 		Options options = new Options();  
 		options.addOption("h", "help", false, "print this usage information");  
 		options.addOption("r", "redis", true, "set the redis service. For example: 127.0.0.1:6379");
-		options.addOption("s", "submit", false, "submit task from a file");
-		CommandLine commandLine = parser.parse( options, args ); 
+		options.addOption("s", "submit", true, "submit task from a file");
+		CommandLine commandLine = parser.parse(options, args); 
 		HelpFormatter formatter = new HelpFormatter();
 		if (commandLine.hasOption('h') ) {
 		    formatter.printHelp("Master", options);
@@ -58,7 +56,7 @@ public class StartMaster {
 		}
 		//含有submit说明是提交任务，不含有则说明是启动master
 		if (commandLine.hasOption('s')){
-			String taskFilePath = commandLine.getOptionValue("s");
+			String taskFilePath = commandLine.getOptionValue('s');
 			Task task = initOneTask(taskFilePath);
 			task.verify();
 			CrawlerMasterProtocol proxy = (CrawlerMasterProtocol) RPC.getProxy(CrawlerMasterProtocol.class,CrawlerMasterProtocol.versionID,new InetSocketAddress("localhost",8666),new Configuration());
