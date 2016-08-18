@@ -3,24 +3,16 @@ package com.banana.master.main;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.rmi.Naming;
-import java.rmi.RemoteException;
-import java.rmi.registry.LocateRegistry;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RPC.Server;
@@ -29,19 +21,17 @@ import com.alibaba.fastjson.JSON;
 import com.banana.master.impl.CrawlerMasterServer;
 
 import banana.core.protocol.CrawlerMasterProtocol;
-import banana.core.protocol.DownloadProtocol;
 import banana.core.protocol.Task;
-import banana.core.util.SystemUtil;
 
 public class StartMaster {
 
 	public static void main(String[] args) throws Exception {
 		args = (args == null || args.length == 0)?new String[]{}:args;
-		CommandLineParser parser = new BasicParser( );  
+		CommandLineParser parser = new DefaultParser( );  
 		Options options = new Options();  
 		options.addOption("h", "help", false, "print this usage information");  
 		options.addOption("r", "redis", true, "set the redis service. For example: 127.0.0.1:6379");
-		options.addOption("s", "submit", true, "submit task from a file");
+		options.addOption("s", "submit", true, "submit task from a jsonfile");
 		CommandLine commandLine = parser.parse(options, args); 
 		HelpFormatter formatter = new HelpFormatter();
 		if (commandLine.hasOption('h') ) {
@@ -60,7 +50,7 @@ public class StartMaster {
 			Task task = initOneTask(taskFilePath);
 			task.verify();
 			CrawlerMasterProtocol proxy = (CrawlerMasterProtocol) RPC.getProxy(CrawlerMasterProtocol.class,CrawlerMasterProtocol.versionID,new InetSocketAddress("localhost",8666),new Configuration());
-			proxy.startTask(task);
+			proxy.submitTask(task);
 		}else{
 			CrawlerMasterServer.init(redis, redisPort);
 			CrawlerMasterProtocol crawlerMasterServer = CrawlerMasterServer.getInstance();

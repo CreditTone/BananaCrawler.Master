@@ -3,6 +3,7 @@ package com.banana.master.task;
 import com.banana.master.RemoteDownload;
 
 import banana.core.exception.DownloadException;
+import banana.core.protocol.Task;
 
 public class RemoteDownloaderTracker {
 	
@@ -11,6 +12,8 @@ public class RemoteDownloaderTracker {
 	private RemoteDownload owner;
 	
 	private TaskTracker taskTracker;
+	
+	private boolean isValid = false;
 	
 	public RemoteDownloaderTracker(int threadNum, RemoteDownload owner) {
 		this.threadNum = threadNum;
@@ -42,10 +45,39 @@ public class RemoteDownloaderTracker {
 	public int getPort(){
 		return owner.getPort();
 	}
+	
+	public boolean isStoped() {
+		return isValid;
+	}
 
 	public void start() throws DownloadException{
 		String taskId = taskTracker.getId();
-		owner.getDownloadProtocol().startDownloadTracker(taskId, threadNum);
+		owner.getDownloadProtocol().startDownloadTracker(taskId, threadNum, taskTracker.getConfig());
+		isValid = true;
+	}
+	
+	public void stop() throws DownloadException{
+		String taskId = taskTracker.getId();
+		owner.getDownloadProtocol().stopDownloadTracker(taskId);
+		isValid = false;
+	}
+	
+	public boolean isWaitRequest(){
+		String taskId = taskTracker.getId();
+		try {
+			return owner.getDownloadProtocol().isWaitRequest(taskId);
+		} catch (DownloadException e) {
+			e.printStackTrace();
+		}
+		return false;
+	}
+	
+	public void updateConfig(int thread){
+		try {
+			owner.getDownloadProtocol().resubmitTaskConfig(taskTracker.getId(), thread, taskTracker.getConfig());
+		} catch (DownloadException e) {
+			e.printStackTrace();
+		}
 	}
 	
 }

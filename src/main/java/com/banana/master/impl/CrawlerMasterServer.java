@@ -22,6 +22,7 @@ import com.banana.master.task.TaskTracker;
 import banana.core.JedisOperator;
 import banana.core.PropertiesNamespace;
 import banana.core.exception.CrawlerMasterException;
+import banana.core.exception.DownloadException;
 import banana.core.protocol.CrawlerMasterProtocol;
 import banana.core.protocol.DownloadProtocol;
 import banana.core.protocol.Task;
@@ -104,19 +105,6 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		}
 	}
 	
-	public void removeDownloadNode(String ip,int port){
-		for (int x = 0; x < downloads.size() ;x++) {
-			RemoteDownload rd = downloads.get(x);
-			if (rd.getIp().equals(ip) && rd.getPort() == port){
-				downloads.remove(x);
-				for (TaskTracker taskTracker:tasks.values()) {
-					taskTracker.removeRemoteDownload(ip, port);
-				}
-				break;
-			}
-		}
-	}
-	
 	public List<RemoteDownload> getDownloads(){
 		return downloads;
 	}
@@ -130,14 +118,14 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		return null;
 	}
 
-	public void pushTaskRequest(String taskId, BasicRequest request) {
+	public void pushTaskRequest(String taskId, HttpRequest request) {
 		TaskTracker task = tasks.get(taskId);
 		if (task != null){
 			task.pushRequest(request);
 		}
 	}
 	
-	public BasicRequest pollTaskRequest(String taskId) {
+	public HttpRequest pollTaskRequest(String taskId) {
 		TaskTracker task = tasks.get(taskId);
 		try {
 			return task.pollRequest();
@@ -163,11 +151,14 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		return new ProtocolSignature(versionID, null);
 	}
 
-	public void startTask(Task config) throws Exception {
+	public void submitTask(Task config) throws Exception {
 		if (downloads.isEmpty()){
 			throw new RuntimeException("There is no downloader");
 		}
-		TaskTracker tracker = new TaskTracker(config.name);
+		if (isResubmit(config)){
+			return;
+		}
+		TaskTracker tracker = new TaskTracker(config);
 		StartContext context = new StartContext();
 		for (Task.Seed seed : config.seeds) {
 			PageRequest req = context.createPageRequest(seed.getUrl(), seed.getProcessor());
@@ -188,11 +179,20 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 			context.injectSeed(req);
 		}
 		tracker.setContext(context);
-		tracker.setConfig(config);
 		tracker.start(config.thread);
 		tasks.put(tracker.getId(), tracker);
 	}
 	
+	private boolean isResubmit(Task config) throws Exception {
+		for (TaskTracker tracker : tasks.values()) {
+			if (config.name.equals(tracker.getTaskName())){
+				tracker.updateConfig(config);
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/**
 	 * 选举Downloader LoadBalance
 	 * @param taskId
@@ -228,14 +228,57 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		}
 		return taskDownloads;
 	}
-
-	@Override
-	public Task getConfig(String taskId) {
-		TaskTracker task = tasks.get(taskId);
-		if (task != null){
-			return task.getConfig();
+	
+	
+	public List<RemoteDownloaderTracker> electAgain(List<RemoteDownloaderTracker> rdts,int addThread) throws Exception {
+		Map<Integer,RemoteDownloaderTracker> newRemoteDownload = null;
+		int allThread = addThread;
+		TaskTracker tracker = null;
+		for (RemoteDownloaderTracker rdt : rdts) {
+			allThread += rdt.getWorkThread();
+			if (tracker == null){
+				tracker = rdt.getTaskTracker();
+			}
 		}
-		return null;
+		int[] threads = new int[rdts.size()];
+		for (int i = 0; i < threads.length; i++) {
+			threads[i] = rdts.get(i).getWorkThread();
+		}
+		
+		Random rand = new Random();
+		if (downloads.size() > rdts.size()){
+			int average = allThread / rdts.size();
+			int shouldNum = downloads.size();
+			int shouldThread; 
+			//预估平均线程数必须大于原有每台机器的线程平均数
+			while((shouldThread = allThread / shouldNum) < average){
+				shouldNum -= 1;
+			}
+			int shouldAddDownload = shouldNum - rdts.size();
+			newRemoteDownload = new HashMap<Integer,RemoteDownloaderTracker>();
+			RemoteDownload newDownload = null;
+			while(shouldAddDownload > 0){
+				int index = rand.nextInt(downloads.size());
+				newDownload = downloads.get(index);
+				if (!newRemoteDownload.containsKey(index) && !tracker.containDownload(newDownload.getIp(), newDownload.getPort())){
+					newRemoteDownload.put(index,new RemoteDownloaderTracker(shouldThread, newDownload));
+					addThread -= shouldThread;
+					shouldAddDownload -= 1;
+				}
+			}
+			if (addThread < 0){
+				logger.info(String.format("allThread %d shouldNum %d shouldThread %d shouldAddDownload %d", allThread, shouldNum ,shouldThread, shouldAddDownload));
+				throw new Exception("elect error");
+			}
+		}
+		for (int j = 0; (j < threads.length && addThread > 0); j++) {
+			threads[j] += 1;
+			addThread -= 1;
+		}
+		for (int i = 0; i < threads.length; i++) {
+			rdts.get(i).updateConfig(threads[i]);
+		}
+		return newRemoteDownload != null?new ArrayList<RemoteDownloaderTracker>(newRemoteDownload.values()):null;
 	}
 	
 }

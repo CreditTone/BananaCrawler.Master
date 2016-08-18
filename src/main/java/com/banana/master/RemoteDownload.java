@@ -5,10 +5,8 @@ import java.util.TimerTask;
 
 import org.apache.log4j.Logger;
 
-import com.banana.master.impl.CrawlerMasterServer;
 
 import banana.core.NodeStatus;
-import banana.core.exception.DownloadException;
 import banana.core.protocol.DownloadProtocol;
 
 public class RemoteDownload extends TimerTask{
@@ -48,10 +46,8 @@ public class RemoteDownload extends TimerTask{
 			lastStatus = downloadProtocol.healthCheck();
 			//logger.info("check health for "+ ip +" info " + lastStatus);
 		} catch (Exception e) {
-			e.printStackTrace();
-			logger.info("check health failure for "+ ip);
+			logger.warn("check health failure for "+ ip,e);
 			timer.cancel();
-			CrawlerMasterServer.getInstance().removeDownloadNode(ip,port);
 		}
 	}
 	
