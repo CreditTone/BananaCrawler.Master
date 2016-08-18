@@ -192,6 +192,8 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		}
 		return false;
 	}
+	
+	
 
 	/**
 	 * 选举Downloader LoadBalance
@@ -279,6 +281,16 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 			rdts.get(i).updateConfig(threads[i]);
 		}
 		return newRemoteDownload != null?new ArrayList<RemoteDownloaderTracker>(newRemoteDownload.values()):null;
+	}
+
+	@Override
+	public boolean existTask(String taskName) {
+		for (TaskTracker tracker : tasks.values()) {
+			if (taskName.equals(tracker.getTaskName())){
+				return true;
+			}
+		}
+		return false;
 	}
 	
 }

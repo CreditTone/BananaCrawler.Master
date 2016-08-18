@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -50,6 +51,15 @@ public class StartMaster {
 			Task task = initOneTask(taskFilePath);
 			task.verify();
 			CrawlerMasterProtocol proxy = (CrawlerMasterProtocol) RPC.getProxy(CrawlerMasterProtocol.class,CrawlerMasterProtocol.versionID,new InetSocketAddress("localhost",8666),new Configuration());
+			if (proxy.existTask(task.name)){
+				Scanner scan = new Scanner(System.in);
+				System.out.print("Name for the task of "+ task.name +" already exists, do you want to update the configuration?\nConfirm the input y/yes:");
+				String yes = scan.next();
+				if (!yes.equalsIgnoreCase("Y") && !yes.equalsIgnoreCase("YES")){
+					System.out.println("Task to submit cancel.");
+					return;
+				}
+			}
 			proxy.submitTask(task);
 		}else{
 			CrawlerMasterServer.init(redis, redisPort);
