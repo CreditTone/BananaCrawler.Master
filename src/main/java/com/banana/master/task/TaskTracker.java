@@ -55,6 +55,8 @@ public class TaskTracker {
 			case "simple":
 				filter = new SimpleBloomFilter();
 				break;
+			default:
+				filter = null;
 			}
 		} else {
 			filter = null;
