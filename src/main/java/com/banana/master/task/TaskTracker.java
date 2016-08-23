@@ -178,9 +178,13 @@ public class TaskTracker {
 	}
 
 	public void pushRequest(HttpRequest request) {
-		if (filter != null && filter.contains(request.getUrl())) {
-			logger.info(String.format("%s filter request %s", taskId, request.getUrl()));
-			return;
+		if (filter != null) {
+			if (filter.contains(request.getUrl())){
+				logger.info(String.format("%s filter request %s", taskId, request.getUrl()));
+				return;
+			}else{
+				filter.add(request.getUrl());
+			}
 		}
 		logger.info(String.format("%s push request %s", taskId, request.getUrl()));
 		request.recodeRequest();
@@ -192,7 +196,7 @@ public class TaskTracker {
 		for (int i = 0; i < 3; i++) {
 			req = requestQueue.poll();
 			if (req != null)
-				break;
+				return req;
 			Thread.sleep(100);
 		}
 		if (isAllWaiting() && requestQueue.isEmpty()) {
@@ -239,6 +243,7 @@ public class TaskTracker {
 				e.printStackTrace();
 			}
 		}
+		CrawlerMasterServer.getInstance().removeTask(taskId);
 		logger.info(config.name + " 完成销毁");
 	}
 }

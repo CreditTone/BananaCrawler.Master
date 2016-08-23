@@ -2,6 +2,7 @@ package com.banana.master.impl;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,6 +12,9 @@ import java.util.Map;
 import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.BooleanWritable;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.ProtocolSignature;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.log4j.Logger;
@@ -18,6 +22,13 @@ import org.apache.log4j.Logger;
 import com.banana.master.RemoteDownload;
 import com.banana.master.task.RemoteDownloaderTracker;
 import com.banana.master.task.TaskTracker;
+import com.mongodb.BasicDBObject;
+import com.mongodb.DB;
+import com.mongodb.DBObject;
+import com.mongodb.MongoClient;
+import com.mongodb.MongoCredential;
+import com.mongodb.ServerAddress;
+import com.mongodb.WriteResult;
 
 import banana.core.JedisOperator;
 import banana.core.PropertiesNamespace;
@@ -43,44 +54,34 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	
 	private static CrawlerMasterServer master = null;
 	
-	private Map<String,Object> masterProperties = new HashMap<String,Object>();
+	private Map<String,Text> masterProperties = new HashMap<String,Text>();
 	
 	private Map<String,TaskTracker> tasks = new HashMap<String, TaskTracker>();
 	
 	private List<RemoteDownload> downloads = new ArrayList<RemoteDownload>();
 	
-	private JedisOperator redis;
+	private DB db;
 	
-	protected CrawlerMasterServer() throws RemoteException {
+	public CrawlerMasterServer() throws RemoteException {
 		super();
 	}
 	
-	public static void init(final String redisHost,final int redisPort){
+	public void init() throws NumberFormatException, UnknownHostException{
 //			JedisOperator jedisOperator = JedisOperator.newInstance(redisHost, redisPort);
-//			Boolean success = jedisOperator.exe(new JedisOperator.Command<Boolean>() {
-//
-//				@Override
-//				public Boolean operation(Jedis jedis) throws Exception {
-//					jedis.setex("TestRedisKey", 1, "TestRedisValue");
-//					return true;
-//				}
-//
-//				@Override
-//				protected void exceptionOccurs(Exception e) {
-//					logger.warn("请给Master配置一个Redis服务");
-//				}
-//			});
-			if (true){
-				try {
-					master = new CrawlerMasterServer();
-					//master.redis = jedisOperator;
-					master.masterProperties.put(PropertiesNamespace.Master.REDIS_HOST, redisHost);
-					master.masterProperties.put(PropertiesNamespace.Master.REDIS_PORT, redisPort);
-				} catch (RemoteException e) {
-					logger.warn("Initialize the master service failure",e);
-					master = null;
-				}
-			}
+		String mongoAddress = masterProperties.get("MONGO").toString();
+		String[] split = mongoAddress.split(",");
+		MongoClient client = null;
+		ServerAddress serverAddress = new ServerAddress(split[0], Integer.parseInt(split[1]));
+		List<ServerAddress> seeds = new ArrayList<ServerAddress>();
+		seeds.add(serverAddress);
+		String userName = split[3];
+		String dataBase = split[2];
+		String password = split[4];
+		MongoCredential credentials = MongoCredential.createCredential(userName, dataBase,
+				password.toCharArray());
+		client = new MongoClient(seeds, Arrays.asList(credentials));
+		db = client.getDB(split[2]);
+		master = this;
 	}
 	
 	public static final CrawlerMasterServer getInstance(){
@@ -135,8 +136,12 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		return null;
 	}
 	
+	public void setMasterPropertie(String name,String value){
+		masterProperties.put(name, new Text(value));
+	}
+	
 	@Override
-	public Object getMasterPropertie(String name) {
+	public Text getMasterPropertie(String name) {
 		return masterProperties.get(name);
 	}
 
@@ -284,13 +289,32 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	}
 
 	@Override
-	public boolean existTask(String taskName) {
+	public BooleanWritable existTask(String taskName) {
 		for (TaskTracker tracker : tasks.values()) {
 			if (taskName.equals(tracker.getTaskName())){
-				return true;
+				return new BooleanWritable(true);
 			}
 		}
-		return false;
+		return new BooleanWritable(false);
+	}
+	
+	public void removeTask(String taskId){
+		tasks.remove(taskId);
+	}
+	
+	@Override
+	public IntWritable removeBeforeResult(String collection, String taskName) throws Exception {
+		WriteResult result = db.getCollection(collection).remove(new BasicDBObject("_task_name", taskName));
+		return new IntWritable(result.getN());
+	}
+
+	@Override
+	public BooleanWritable dataExists(String collection,String taskName) {
+		if (db.collectionExists(collection)){
+			DBObject obj = db.getCollection(collection).findOne(new BasicDBObject("_task_name", taskName));
+			return new BooleanWritable(obj != null);
+		}
+		return new BooleanWritable(false);
 	}
 	
 }

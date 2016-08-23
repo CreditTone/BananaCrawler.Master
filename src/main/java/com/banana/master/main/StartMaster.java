@@ -31,28 +31,30 @@ public class StartMaster {
 		CommandLineParser parser = new DefaultParser( );  
 		Options options = new Options();  
 		options.addOption("h", "help", false, "print this usage information");  
-		options.addOption("r", "redis", true, "set the redis service. For example: 127.0.0.1:6379");
 		options.addOption("s", "submit", true, "submit task from a jsonfile");
+		options.addOption("e", "extractor", true, "Set the extractor host");
+		options.addOption("mdb", "mongodb", true, "Set the mongodb host and username/password");
 		CommandLine commandLine = parser.parse(options, args); 
 		HelpFormatter formatter = new HelpFormatter();
 		if (commandLine.hasOption('h') ) {
 		    formatter.printHelp("Master", options);
-		    System.exit(0);
+		    return;
 		}
-		String redis = "localhost";
-		int redisPort = 6379;
-		if (commandLine.hasOption('r') ) {
-			redis = commandLine.getOptionValue("r").split(":")[0];
-			redisPort = Integer.parseInt(commandLine.getOptionValue("r").split(":")[1]);
+		if (!commandLine.hasOption('s') && (!commandLine.hasOption("mdb") || !commandLine.hasOption("e"))){
+			System.out.println("Must have mongodb、extractor configuration");
+			formatter.printHelp("Master", options);
+			return;
 		}
+		String mongoAddress = commandLine.getOptionValue("mdb");
+		String extractorAddress = commandLine.getOptionValue("e");
 		//含有submit说明是提交任务，不含有则说明是启动master
 		if (commandLine.hasOption('s')){
 			String taskFilePath = commandLine.getOptionValue('s');
 			Task task = initOneTask(taskFilePath);
 			task.verify();
+			Scanner scan = new Scanner(System.in);
 			CrawlerMasterProtocol proxy = (CrawlerMasterProtocol) RPC.getProxy(CrawlerMasterProtocol.class,CrawlerMasterProtocol.versionID,new InetSocketAddress("localhost",8666),new Configuration());
-			if (proxy.existTask(task.name)){
-				Scanner scan = new Scanner(System.in);
+			if (proxy.existTask(task.name).get()){
 				System.out.print("Name for the task of "+ task.name +" already exists, do you want to update the configuration?\nConfirm the input y/yes:");
 				String yes = scan.next();
 				if (!yes.equalsIgnoreCase("Y") && !yes.equalsIgnoreCase("YES")){
@@ -60,10 +62,21 @@ public class StartMaster {
 					return;
 				}
 			}
+			if (proxy.dataExists(task.collection, task.name).get()){
+				System.out.print("You need to remove before fetching result?\nConfirm the input y/yes:");
+				String yes = scan.next();
+				if (yes.equalsIgnoreCase("Y") || yes.equalsIgnoreCase("YES")){
+					int n = proxy.removeBeforeResult(task.collection, task.name).get();
+					System.out.println("Delete article " + n);
+				}
+			}
 			proxy.submitTask(task);
+			System.out.println("Task to run");
 		}else{
-			CrawlerMasterServer.init(redis, redisPort);
-			CrawlerMasterProtocol crawlerMasterServer = CrawlerMasterServer.getInstance();
+			CrawlerMasterServer crawlerMasterServer = new CrawlerMasterServer();
+			crawlerMasterServer.setMasterPropertie("MONGO", mongoAddress);
+			crawlerMasterServer.setMasterPropertie("EXTRACTOR", extractorAddress);
+			crawlerMasterServer.init();
 			if (crawlerMasterServer != null){
 				Server server = new RPC.Builder(new Configuration()).setProtocol(CrawlerMasterProtocol.class)
 		                .setInstance(crawlerMasterServer).setBindAddress("0.0.0.0").setPort(8666)
@@ -74,29 +87,11 @@ public class StartMaster {
 		}
 	}
 	
-	public static List<Task> initTask(String path) throws IOException{
-		List<Task> tasks = new ArrayList<Task>();
-		File file = new File(path);
-		String[] jsonFile = file.list(new FilenameFilter() {
-			
-			@Override
-			public boolean accept(File dir, String name) {
-				return name.endsWith(".json");
-			}
-		});
-		Task task = null;
-		for (int i = 0; i < jsonFile.length; i++) {
-			String json = FileUtils.readFileToString(new File(jsonFile[i]), "utf-8");
-			task = JSON.parseObject(json, Task.class);
-			tasks.add(task);
-		}
-		return tasks;
-	}
-	
 	public static Task initOneTask(String path) throws IOException{
 		File file = new File(path);
 		String json = FileUtils.readFileToString(file, "utf-8");
 		Task task = JSON.parseObject(json, Task.class);
+		task.data = json;
 		return task;
 	}
 	
