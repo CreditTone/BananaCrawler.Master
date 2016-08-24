@@ -1,4 +1,4 @@
-package com.banana.master;
+package banana.master;
 
 import java.util.Timer;
 import java.util.TimerTask;

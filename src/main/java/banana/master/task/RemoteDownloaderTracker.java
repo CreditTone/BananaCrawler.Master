@@ -1,9 +1,8 @@
-package com.banana.master.task;
-
-import com.banana.master.RemoteDownload;
+package banana.master.task;
 
 import banana.core.exception.DownloadException;
 import banana.core.protocol.Task;
+import banana.master.RemoteDownload;
 
 public class RemoteDownloaderTracker {
 	

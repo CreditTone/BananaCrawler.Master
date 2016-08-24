@@ -1,4 +1,4 @@
-package com.banana.master.impl;
+package banana.master.impl;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -19,9 +19,6 @@ import org.apache.hadoop.ipc.ProtocolSignature;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.log4j.Logger;
 
-import com.banana.master.RemoteDownload;
-import com.banana.master.task.RemoteDownloaderTracker;
-import com.banana.master.task.TaskTracker;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBObject;
@@ -41,6 +38,9 @@ import banana.core.request.BasicRequest;
 import banana.core.request.HttpRequest;
 import banana.core.request.PageRequest;
 import banana.core.request.StartContext;
+import banana.master.RemoteDownload;
+import banana.master.task.RemoteDownloaderTracker;
+import banana.master.task.TaskTracker;
 import redis.clients.jedis.Jedis;
 
 public final class CrawlerMasterServer implements CrawlerMasterProtocol {

@@ -1,4 +1,4 @@
-package com.banana.master.task;
+package banana.master.task;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -12,8 +12,6 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 
-import com.banana.master.impl.CrawlerMasterServer;
-
 import banana.core.PropertiesNamespace;
 import banana.core.exception.DownloadException;
 import banana.core.filter.Filter;
@@ -26,6 +24,7 @@ import banana.core.queue.RequestQueueBuilder;
 import banana.core.queue.SimpleBlockingQueue;
 import banana.core.request.HttpRequest;
 import banana.core.request.StartContext;
+import banana.master.impl.CrawlerMasterServer;
 
 public class TaskTracker {
 

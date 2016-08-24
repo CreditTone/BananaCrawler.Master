@@ -1,4 +1,4 @@
-package com.banana.master.main;
+package banana.master.main;
 
 import java.io.File;
 import java.io.FilenameFilter;
@@ -19,10 +19,10 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RPC.Server;
 
 import com.alibaba.fastjson.JSON;
-import com.banana.master.impl.CrawlerMasterServer;
 
 import banana.core.protocol.CrawlerMasterProtocol;
 import banana.core.protocol.Task;
+import banana.master.impl.CrawlerMasterServer;
 
 public class StartMaster {
 
