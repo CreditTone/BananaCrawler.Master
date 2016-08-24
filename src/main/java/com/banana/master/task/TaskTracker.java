@@ -17,9 +17,12 @@ import com.banana.master.impl.CrawlerMasterServer;
 import banana.core.PropertiesNamespace;
 import banana.core.exception.DownloadException;
 import banana.core.filter.Filter;
+import banana.core.filter.NotFilter;
 import banana.core.filter.SimpleBloomFilter;
 import banana.core.protocol.Task;
 import banana.core.queue.BlockingRequestQueue;
+import banana.core.queue.DelayedBlockingQueue;
+import banana.core.queue.RequestQueueBuilder;
 import banana.core.queue.SimpleBlockingQueue;
 import banana.core.request.HttpRequest;
 import banana.core.request.StartContext;
@@ -34,7 +37,7 @@ public class TaskTracker {
 
 	private List<RemoteDownloaderTracker> downloads = new ArrayList<RemoteDownloaderTracker>();
 
-	private BlockingRequestQueue requestQueue = new SimpleBlockingQueue();
+	private BlockingRequestQueue requestQueue;
 
 	private StartContext context;
 
@@ -44,23 +47,34 @@ public class TaskTracker {
 
 	public TaskTracker(Task taskConfig) {
 		config = taskConfig;
-		initFilter();
 		taskId = taskConfig.name + "_" + new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
 		properties.put(PropertiesNamespace.Task.MAX_PAGE_RETRY_COUNT, 1);
+		init();
 	}
 
-	private void initFilter() {
+	private void init() {
+		filter = new NotFilter();
 		if (config.filter != null && config.filter.length() > 0) {
 			switch (config.filter) {
 			case "simple":
 				filter = new SimpleBloomFilter();
 				break;
-			default:
-				filter = null;
 			}
-		} else {
-			filter = null;
 		}
+		
+		int delay = 0;
+		boolean suportPriority = false;
+		if (config.queue.containsKey("delay")){
+			delay = (int) config.queue.get("delay");
+		}
+		if (config.queue.containsKey("suport_priority")){
+			suportPriority = (boolean) config.queue.get("suport_priority");
+		}
+		RequestQueueBuilder builder = new RequestQueueBuilder()
+				.setDelayPeriod(delay)
+				.setSuportPriority(suportPriority);
+		requestQueue = builder.build();
+		logger.info(String.format("TaskTracker %s use filter %s queue %s", taskId, filter.getClass().getName(), requestQueue.getClass().getName()));
 	}
 
 	public String getTaskName() {
@@ -112,7 +126,7 @@ public class TaskTracker {
 	public void updateConfig(Task taskConfig) throws Exception {
 		int diffNum = taskConfig.thread - config.thread;
 		config = taskConfig;
-		initFilter();
+		init();
 		if (diffNum == 0) {
 			for (RemoteDownloaderTracker rdt : downloads) {
 				rdt.updateConfig(taskConfig.thread);
@@ -178,13 +192,11 @@ public class TaskTracker {
 	}
 
 	public void pushRequest(HttpRequest request) {
-		if (filter != null) {
-			if (filter.contains(request.getUrl())){
-				logger.info(String.format("%s filter request %s", taskId, request.getUrl()));
-				return;
-			}else{
-				filter.add(request.getUrl());
-			}
+		if (filter.contains(request.getUrl())){
+			logger.info(String.format("%s filter request %s", taskId, request.getUrl()));
+			return;
+		}else{
+			filter.add(request.getUrl());
 		}
 		logger.info(String.format("%s push request %s", taskId, request.getUrl()));
 		request.recodeRequest();

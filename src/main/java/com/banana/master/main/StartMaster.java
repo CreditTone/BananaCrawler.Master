@@ -28,12 +28,13 @@ public class StartMaster {
 
 	public static void main(String[] args) throws Exception {
 		args = (args == null || args.length == 0)?new String[]{}:args;
-		CommandLineParser parser = new DefaultParser( );  
-		Options options = new Options();  
+		CommandLineParser parser = new DefaultParser();  
+		Options options = new Options();
 		options.addOption("h", "help", false, "print this usage information");  
 		options.addOption("s", "submit", true, "submit task from a jsonfile");
 		options.addOption("e", "extractor", true, "Set the extractor host");
 		options.addOption("mdb", "mongodb", true, "Set the mongodb host and username/password");
+		options.addOption("t", "test", true, "test task from a jsonfile");
 		CommandLine commandLine = parser.parse(options, args); 
 		HelpFormatter formatter = new HelpFormatter();
 		if (commandLine.hasOption('h') ) {

@@ -64,6 +64,7 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	
 	public CrawlerMasterServer() throws RemoteException {
 		super();
+		master = this;
 	}
 	
 	public void init() throws NumberFormatException, UnknownHostException{
@@ -81,7 +82,6 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 				password.toCharArray());
 		client = new MongoClient(seeds, Arrays.asList(credentials));
 		db = client.getDB(split[2]);
-		master = this;
 	}
 	
 	public static final CrawlerMasterServer getInstance(){
