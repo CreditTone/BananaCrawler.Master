@@ -43,6 +43,8 @@ public class TaskTracker {
 	private Map<String, Object> properties = new HashMap<String, Object>();
 
 	private Filter filter = null;
+	
+	private int loopCount = 0;
 
 	public TaskTracker(Task taskConfig) {
 		config = taskConfig;
@@ -102,6 +104,13 @@ public class TaskTracker {
 		}
 		return properties.get(propertie);
 	}
+	
+	private void initSeedRequest() {
+		List<HttpRequest> seeds = context.getSeedRequests();
+		for (HttpRequest req : seeds) {
+			requestQueue.add(req);
+		}
+	}
 
 	public void start(int thread) throws Exception {
 		downloads = CrawlerMasterServer.getInstance().elect(taskId, thread);
@@ -112,10 +121,7 @@ public class TaskTracker {
 		if (downloads.isEmpty()) {
 			throw new Exception("Not set any downloader");
 		}
-		List<HttpRequest> seeds = context.getSeedRequests();
-		for (HttpRequest req : seeds) {
-			pushRequest(req);
-		}
+		initSeedRequest();
 		for (RemoteDownloaderTracker taskDownload : downloads) {
 			taskDownload.setTaskTracker(this);
 			taskDownload.start();
@@ -211,9 +217,15 @@ public class TaskTracker {
 			Thread.sleep(100);
 		}
 		if (isAllWaiting() && requestQueue.isEmpty()) {
-			destoryTask();
+			loopCount ++;
+			if (loopCount == config.loops){
+				destoryTask();
+			}else{
+				logger.info(String.format("finish loop The %d times", loopCount));
+				initSeedRequest();
+			}
 		}
-		return req;
+		return requestQueue.poll();
 	}
 
 	private boolean isAllWaiting() {
