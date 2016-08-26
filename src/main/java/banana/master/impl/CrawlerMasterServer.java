@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Timer;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BooleanWritable;
@@ -26,6 +27,8 @@ import com.mongodb.MongoClient;
 import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
 import com.mongodb.WriteResult;
+import com.mongodb.gridfs.GridFS;
+import com.mongodb.gridfs.GridFSDBFile;
 
 import banana.core.JedisOperator;
 import banana.core.PropertiesNamespace;
@@ -60,7 +63,7 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	
 	private List<RemoteDownload> downloads = new ArrayList<RemoteDownload>();
 	
-	private DB db;
+	public DB db;
 	
 	public CrawlerMasterServer() throws RemoteException {
 		super();
@@ -164,27 +167,7 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 			return;
 		}
 		TaskTracker tracker = new TaskTracker(config);
-		StartContext context = new StartContext();
-		for (Task.Seed seed : config.seeds) {
-			PageRequest req = context.createPageRequest(seed.getUrl(), seed.getProcessor());
-			if (seed.getMethod() == null || "GET".equalsIgnoreCase(seed.getMethod())){
-				req.setMethod(HttpRequest.Method.GET);
-			}else{
-				req.setMethod(HttpRequest.Method.POST);
-				Map<String,String> params = seed.getParams();
-				for (Map.Entry<String, String> valuePair : params.entrySet()){
-					req.putParams(valuePair.getKey(), valuePair.getValue());
-				}
-			}
-			if (seed.getHeaders() != null){
-				for (Map.Entry<String, String> valuePair : seed.getHeaders().entrySet()) {
-					req.putHeader(valuePair.getKey(), valuePair.getValue());
-				}
-			}
-			context.injectSeed(req);
-		}
-		tracker.setContext(context);
-		tracker.start(config.thread);
+		tracker.start();
 		tasks.put(tracker.getId(), tracker);
 	}
 	
@@ -315,6 +298,13 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 			return new BooleanWritable(obj != null);
 		}
 		return new BooleanWritable(false);
+	}
+
+	@Override
+	public BooleanWritable statExists(String collection, String taskname) {
+		GridFS tracker_status = new GridFS(db,"tracker_stat");
+		GridFSDBFile file = tracker_status.findOne(taskname + "_" + collection + "_filter");
+		return new BooleanWritable(file != null);
 	}
 	
 }

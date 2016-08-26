@@ -53,6 +53,7 @@ public class StartMaster {
 			String taskFilePath = commandLine.getOptionValue('s');
 			Task task = initOneTask(taskFilePath);
 			task.verify();
+			boolean resubmit = false;
 			Scanner scan = new Scanner(System.in);
 			CrawlerMasterProtocol proxy = (CrawlerMasterProtocol) RPC.getProxy(CrawlerMasterProtocol.class,CrawlerMasterProtocol.versionID,new InetSocketAddress("localhost",8666),new Configuration());
 			if (proxy.existTask(task.name).get()){
@@ -62,13 +63,21 @@ public class StartMaster {
 					System.out.println("Task to submit cancel.");
 					return;
 				}
+				resubmit = true;
 			}
 			if (proxy.dataExists(task.collection, task.name).get()){
-				System.out.print("You need to remove before fetching result?\nConfirm the input y/yes:");
+				System.out.print("Do you need to remove before fetching result?\nConfirm the input y/yes:");
 				String yes = scan.next();
 				if (yes.equalsIgnoreCase("Y") || yes.equalsIgnoreCase("YES")){
 					int n = proxy.removeBeforeResult(task.collection, task.name).get();
 					System.out.println("Delete article " + n);
+				}
+			}
+			if (!resubmit && proxy.statExists(task.collection, task.name).get()){
+				System.out.print("Do you need to synchronize the previous state?\nConfirm the input y/yes:");
+				String yes = scan.next();
+				if (yes.equalsIgnoreCase("Y") || yes.equalsIgnoreCase("YES")){
+					task.synchronizeStat = true;
 				}
 			}
 			proxy.submitTask(task);

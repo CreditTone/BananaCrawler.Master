@@ -2,28 +2,37 @@ package banana.master.task;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.io.Text;
 import org.apache.log4j.Logger;
 
-import banana.core.PropertiesNamespace;
+import com.mongodb.DB;
+import com.mongodb.MongoClient;
+import com.mongodb.MongoCredential;
+import com.mongodb.ServerAddress;
+import com.mongodb.gridfs.GridFS;
+import com.mongodb.gridfs.GridFSDBFile;
+
 import banana.core.exception.DownloadException;
 import banana.core.filter.Filter;
 import banana.core.filter.NotFilter;
 import banana.core.filter.SimpleBloomFilter;
 import banana.core.protocol.Task;
 import banana.core.queue.BlockingRequestQueue;
-import banana.core.queue.DelayedBlockingQueue;
 import banana.core.queue.RequestQueueBuilder;
-import banana.core.queue.SimpleBlockingQueue;
 import banana.core.request.HttpRequest;
+import banana.core.request.PageRequest;
 import banana.core.request.StartContext;
+import banana.core.util.SystemUtil;
 import banana.master.impl.CrawlerMasterServer;
 
 public class TaskTracker {
@@ -40,44 +49,92 @@ public class TaskTracker {
 
 	private StartContext context;
 
-	private Map<String, Object> properties = new HashMap<String, Object>();
-
 	private Filter filter = null;
 	
 	private int loopCount = 0;
-
+	
+	private BackupRunnable backupRunnable = new BackupRunnable();
+	
 	public TaskTracker(Task taskConfig) {
 		config = taskConfig;
 		taskId = taskConfig.name + "_" + new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
-		properties.put(PropertiesNamespace.Task.MAX_PAGE_RETRY_COUNT, 1);
-		init();
+		context = new StartContext();
+		initSeed(config.seeds);
+		initFilter(config.filter);
+		initQueue(config.queue);
+		initPreviousState(config.synchronizeStat, config.name, config.collection);
+		backupRunnable.setConfig(config);
+		backupRunnable.setContext(context);
+		backupRunnable.setFilter(filter);
+		logger.info(String.format("TaskTracker %s use filter %s queue %s", taskId, filter.getClass().getName(), requestQueue.getClass().getName()));
 	}
-
-	private void init() {
+	
+	private void initSeed(List<Task.Seed> seeds){
+		for (Task.Seed seed : seeds) {
+			PageRequest req = context.createPageRequest(seed.getUrl(), seed.getProcessor());
+			if (seed.getMethod() == null || "GET".equalsIgnoreCase(seed.getMethod())){
+				req.setMethod(HttpRequest.Method.GET);
+			}else{
+				req.setMethod(HttpRequest.Method.POST);
+				Map<String,String> params = seed.getParams();
+				for (Map.Entry<String, String> valuePair : params.entrySet()){
+					req.putParams(valuePair.getKey(), valuePair.getValue());
+				}
+			}
+			if (seed.getHeaders() != null){
+				for (Map.Entry<String, String> valuePair : seed.getHeaders().entrySet()) {
+					req.putHeader(valuePair.getKey(), valuePair.getValue());
+				}
+			}
+			context.injectSeed(req);
+		}
+	}
+	
+	private void initFilter(Task.Filter filtercfg){
 		filter = new NotFilter();
-		if (config.filter != null && config.filter.length() > 0) {
-			switch (config.filter) {
+		if (filtercfg.type != null && filtercfg.type.length() > 0) {
+			switch (filtercfg.type) {
 			case "simple":
 				filter = new SimpleBloomFilter();
 				break;
 			}
 		}
-		
+	}
+	
+	private void initQueue(Map<String,Object> queuecfg){
 		int delay = 0;
 		boolean suportPriority = false;
-		if (config.queue.containsKey("delay")){
-			delay = (int) config.queue.get("delay");
+		if (queuecfg.containsKey("delay")){
+			delay = (int) queuecfg.get("delay");
 		}
-		if (config.queue.containsKey("suport_priority")){
-			suportPriority = (boolean) config.queue.get("suport_priority");
+		if (queuecfg.containsKey("suport_priority")){
+			suportPriority = (boolean) queuecfg.get("suport_priority");
 		}
 		RequestQueueBuilder builder = new RequestQueueBuilder()
 				.setDelayPeriod(delay)
 				.setSuportPriority(suportPriority);
 		requestQueue = builder.build();
-		logger.info(String.format("TaskTracker %s use filter %s queue %s", taskId, filter.getClass().getName(), requestQueue.getClass().getName()));
 	}
+	
 
+	private void initPreviousState(boolean synchronizeStat,String name,String collection) {
+		if (synchronizeStat){
+			GridFS tracker_status = new GridFS(CrawlerMasterServer.getInstance().db,"tracker_stat");
+			GridFSDBFile file = tracker_status.findOne(name + "_" + collection + "_filter");
+			if (file != null){
+				byte[] filterData = SystemUtil.inputStreamToBytes(file.getInputStream());
+				System.out.println("filterData len = " + filterData.length);
+				filter.load(filterData);
+			}
+			file = tracker_status.findOne(name + "_" + collection + "_context");
+			if (file != null){
+				byte[] contextData = SystemUtil.inputStreamToBytes(file.getInputStream());
+				System.out.println("contextData len = " + contextData.length);
+				context.load(contextData);
+			}
+		}
+	}
+	
 	public String getTaskName() {
 		return config.name;
 	}
@@ -93,16 +150,16 @@ public class TaskTracker {
 	public StartContext getContext() {
 		return context;
 	}
-
-	public void setContext(StartContext context) {
-		this.context = context;
-	}
-
+	
 	public Object getProperties(String propertie) {
 		if (propertie == null) {
 			return config;
 		}
-		return properties.get(propertie);
+		Object result = context.getContextAttribute(propertie);
+		if (result instanceof String){
+			return new Text((String) result);
+		}
+		return result;
 	}
 	
 	private void initSeedRequest() {
@@ -112,8 +169,8 @@ public class TaskTracker {
 		}
 	}
 
-	public void start(int thread) throws Exception {
-		downloads = CrawlerMasterServer.getInstance().elect(taskId, thread);
+	public void start() throws Exception {
+		downloads = CrawlerMasterServer.getInstance().elect(taskId, config.thread);
 		logger.info(String.format("%s 分配了%d个Downloader", taskId, downloads.size()));
 		for (RemoteDownloaderTracker rdt : downloads) {
 			logger.info(String.format("%s Downloader %s Thread %d", taskId, rdt.getIp(), rdt.getWorkThread()));
@@ -130,8 +187,13 @@ public class TaskTracker {
 
 	public void updateConfig(Task taskConfig) throws Exception {
 		int diffNum = taskConfig.thread - config.thread;
+		if (!config.filter.equals(taskConfig.filter)){
+			initFilter(taskConfig.filter);
+		}
+		if (!config.queue.equals(taskConfig.queue)){
+			initQueue(taskConfig.queue);
+		}
 		config = taskConfig;
-		init();
 		if (diffNum == 0) {
 			for (RemoteDownloaderTracker rdt : downloads) {
 				rdt.updateConfig(taskConfig.thread);
@@ -197,11 +259,13 @@ public class TaskTracker {
 	}
 
 	public void pushRequest(HttpRequest request) {
-		if (filter.contains(request.getUrl())){
-			logger.info(String.format("%s filter request %s", taskId, request.getUrl()));
-			return;
-		}else{
-			filter.add(request.getUrl());
+		if (config.filter.target.contains(request.getProcessor())){
+			if (filter.contains(request.getUrl())){
+				logger.info(String.format("%s filter request %s", taskId, request.getUrl()));
+				return;
+			}else{
+				filter.add(request.getUrl());
+			}
 		}
 		logger.info(String.format("%s push request %s", taskId, request.getUrl()));
 		request.recodeRequest();
@@ -217,12 +281,16 @@ public class TaskTracker {
 			Thread.sleep(100);
 		}
 		if (isAllWaiting() && requestQueue.isEmpty()) {
-			loopCount ++;
-			if (loopCount == config.loops){
-				destoryTask();
-			}else{
-				logger.info(String.format("finish loop The %d times", loopCount));
-				initSeedRequest();
+			synchronized (this) {
+				if (requestQueue.isEmpty()){
+					loopCount ++;
+					if (loopCount == config.loops){
+						destoryTask();
+					}else{
+						logger.info(String.format("finish loop The %d times", loopCount));
+						initSeedRequest();
+					}
+				}
 			}
 		}
 		return requestQueue.poll();
@@ -267,6 +335,7 @@ public class TaskTracker {
 			}
 		}
 		CrawlerMasterServer.getInstance().removeTask(taskId);
+		backupRunnable.close();
 		logger.info(config.name + " 完成销毁");
 	}
 }
