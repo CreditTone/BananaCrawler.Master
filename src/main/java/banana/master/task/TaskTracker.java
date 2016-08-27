@@ -36,6 +36,12 @@ import banana.core.util.SystemUtil;
 import banana.master.impl.CrawlerMasterServer;
 
 public class TaskTracker {
+	
+	public static final int RUN_MODE = 0;
+	
+	public static final int TEST_MODE = 1;
+	
+	public static int MODE = RUN_MODE;
 
 	private static Logger logger = Logger.getLogger(TaskTracker.class);
 
@@ -53,7 +59,7 @@ public class TaskTracker {
 	
 	private int loopCount = 0;
 	
-	private BackupRunnable backupRunnable = new BackupRunnable();
+	private BackupRunnable backupRunnable;
 	
 	public TaskTracker(Task taskConfig) {
 		config = taskConfig;
@@ -62,11 +68,21 @@ public class TaskTracker {
 		initSeed(config.seeds);
 		initFilter(config.filter);
 		initQueue(config.queue);
+		setBackup();
 		initPreviousState(config.synchronizeStat, config.name, config.collection);
+		logger.info(String.format("TaskTracker %s use filter %s queue %s", taskId, filter.getClass().getName(), requestQueue.getClass().getName()));
+	}
+	
+	private void setBackup(){
+		if (MODE == TEST_MODE){
+			return;
+		}
+		if (backupRunnable == null){
+			backupRunnable = new BackupRunnable();
+		}
 		backupRunnable.setConfig(config);
 		backupRunnable.setContext(context);
 		backupRunnable.setFilter(filter);
-		logger.info(String.format("TaskTracker %s use filter %s queue %s", taskId, filter.getClass().getName(), requestQueue.getClass().getName()));
 	}
 	
 	private void initSeed(List<Task.Seed> seeds){
@@ -189,6 +205,7 @@ public class TaskTracker {
 		int diffNum = taskConfig.thread - config.thread;
 		if (!config.filter.equals(taskConfig.filter)){
 			initFilter(taskConfig.filter);
+			backupRunnable.setFilter(filter);
 		}
 		if (!config.queue.equals(taskConfig.queue)){
 			initQueue(taskConfig.queue);
