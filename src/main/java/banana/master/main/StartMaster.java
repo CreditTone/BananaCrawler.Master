@@ -65,7 +65,7 @@ public class StartMaster {
 				}
 				resubmit = true;
 			}
-			if (proxy.dataExists(task.collection, task.name).get()){
+			if (proxy.taskdataExists(task.collection, task.name).get()){
 				System.out.print("Do you need to remove before fetching result?\nConfirm the input y/yes:");
 				String yes = scan.next();
 				if (yes.equalsIgnoreCase("Y") || yes.equalsIgnoreCase("YES")){

@@ -312,6 +312,21 @@ public class TaskTracker {
 		}
 		return requestQueue.poll();
 	}
+	
+	public boolean filterQuery(String ... fields){
+		for (int i = 0; i < fields.length; i++) {
+			if (!filter.contains(fields[i])){
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	public void addFilter(String ... fields){
+		for (int i = 0; i < fields.length; i++) {
+			filter.add(fields[i]);
+		}
+	}
 
 	private boolean isAllWaiting() {
 		for (RemoteDownloaderTracker rdt : downloads) {
@@ -352,7 +367,9 @@ public class TaskTracker {
 			}
 		}
 		CrawlerMasterServer.getInstance().removeTask(taskId);
-		backupRunnable.close();
+		if (backupRunnable != null){
+			backupRunnable.close();
+		}
 		logger.info(config.name + " 完成销毁");
 	}
 }

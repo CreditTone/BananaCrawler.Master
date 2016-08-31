@@ -292,7 +292,7 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	}
 
 	@Override
-	public BooleanWritable dataExists(String collection,String taskName) {
+	public BooleanWritable taskdataExists(String collection,String taskName) {
 		if (db.collectionExists(collection)){
 			DBObject obj = db.getCollection(collection).findOne(new BasicDBObject("_task_name", taskName));
 			return new BooleanWritable(obj != null);
@@ -305,6 +305,17 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		GridFS tracker_status = new GridFS(db,"tracker_stat");
 		GridFSDBFile file = tracker_status.findOne(taskname + "_" + collection + "_filter");
 		return new BooleanWritable(file != null);
+	}
+
+	@Override
+	public BooleanWritable filterQuery(String taskId, String... fields) {
+		TaskTracker task = tasks.get(taskId);
+		if (task != null){
+			boolean result = task.filterQuery(fields);
+			task.addFilter(fields);
+			return new BooleanWritable(result);
+		}
+		return null;
 	}
 	
 }
