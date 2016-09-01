@@ -313,7 +313,7 @@ public class TaskTracker {
 		return requestQueue.poll();
 	}
 	
-	public boolean filterQuery(String ... fields){
+	public synchronized boolean filterQuery(String ... fields){
 		for (int i = 0; i < fields.length; i++) {
 			if (!filter.contains(fields[i])){
 				return false;
