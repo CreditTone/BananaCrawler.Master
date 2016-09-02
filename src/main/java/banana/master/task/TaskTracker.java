@@ -2,23 +2,16 @@ package banana.master.task;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.log4j.Logger;
 
-import com.mongodb.DB;
-import com.mongodb.MongoClient;
-import com.mongodb.MongoCredential;
-import com.mongodb.ServerAddress;
 import com.mongodb.gridfs.GridFS;
 import com.mongodb.gridfs.GridFSDBFile;
 
@@ -83,6 +76,7 @@ public class TaskTracker {
 		backupRunnable.setConfig(config);
 		backupRunnable.setContext(context);
 		backupRunnable.setFilter(filter);
+		backupRunnable.setRequestQueue(requestQueue);
 	}
 	
 	private void initSeed(List<Task.Seed> seeds){
@@ -147,6 +141,10 @@ public class TaskTracker {
 				byte[] contextData = SystemUtil.inputStreamToBytes(file.getInputStream());
 				System.out.println("contextData len = " + contextData.length);
 				context.load(contextData);
+			}
+			file = tracker_status.findOne(name + "_" + collection + "_links");
+			if (file != null){
+				requestQueue.load(file.getInputStream());
 			}
 		}
 	}
@@ -349,7 +347,7 @@ public class TaskTracker {
 	/**
 	 * 任务完成销毁任务
 	 */
-	private final void destoryTask() {
+	public final void destoryTask() {
 		for (RemoteDownloaderTracker taskDownload : downloads) {
 			try {
 				taskDownload.stop();
@@ -357,7 +355,9 @@ public class TaskTracker {
 				e.printStackTrace();
 			}
 		}
-		// 释放队列
+		if (backupRunnable != null){
+			backupRunnable.close();
+		}
 		if (requestQueue instanceof Closeable) {
 			Closeable closeable = (Closeable) requestQueue;
 			try {
@@ -367,9 +367,6 @@ public class TaskTracker {
 			}
 		}
 		CrawlerMasterServer.getInstance().removeTask(taskId);
-		if (backupRunnable != null){
-			backupRunnable.close();
-		}
 		logger.info(config.name + " 完成销毁");
 	}
 }

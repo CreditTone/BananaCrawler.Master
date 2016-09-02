@@ -317,5 +317,15 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		}
 		return null;
 	}
+
+	@Override
+	public void stopTask(String taskname) throws Exception {
+		for (TaskTracker tracker : tasks.values()) {
+			if (taskname.equals(tracker.getTaskName())){
+				tracker.destoryTask();
+				break;
+			}
+		}
+	}
 	
 }

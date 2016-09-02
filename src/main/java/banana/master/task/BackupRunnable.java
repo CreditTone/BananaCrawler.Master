@@ -1,7 +1,7 @@
 package banana.master.task;
 
 import java.io.Closeable;
-import java.io.IOException;
+import java.io.InputStream;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -10,6 +10,7 @@ import com.mongodb.gridfs.GridFSInputFile;
 
 import banana.core.filter.Filter;
 import banana.core.protocol.Task;
+import banana.core.queue.BlockingRequestQueue;
 import banana.core.request.StartContext;
 import banana.master.impl.CrawlerMasterServer;
 
@@ -23,8 +24,10 @@ public class BackupRunnable extends TimerTask implements Closeable {
 	
 	private Filter filter = null;
 	
+	private BlockingRequestQueue requestQueue;
+	
 	public BackupRunnable(){
-		timer.schedule(this, 1000 * 180, 1000 * 180);
+		timer.schedule(this, 1000 * 60, 1000 * 60);
 	}
 	
 	public Task getConfig() {
@@ -51,8 +54,16 @@ public class BackupRunnable extends TimerTask implements Closeable {
 		this.filter = filter;
 	}
 
+	public BlockingRequestQueue getRequestQueue() {
+		return requestQueue;
+	}
+
+	public void setRequestQueue(BlockingRequestQueue requestQueue) {
+		this.requestQueue = requestQueue;
+	}
+
 	@Override
-	public void run() {
+	public synchronized void run() {
 		if (filter == null && context == null){
 			return;
 		}
@@ -72,10 +83,22 @@ public class BackupRunnable extends TimerTask implements Closeable {
 		file.setFilename(filename);
 		file.save();
 	}
+	
+	private void backupLinks(){
+		GridFS tracker_status = new GridFS(CrawlerMasterServer.getInstance().db,"tracker_stat");
+		String filename = config.name + "_" + config.collection + "_links";
+		tracker_status.remove(filename);
+		InputStream input = requestQueue.getStream();
+		GridFSInputFile file = tracker_status.createFile(input);
+		file.setFilename(filename);
+		file.save();
+	}
 
 
 	@Override
 	public void close(){
+		run();
+		backupLinks();
 		timer.cancel();
 	}
 
