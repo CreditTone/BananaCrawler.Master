@@ -1,5 +1,6 @@
 package banana.master.task;
 
+import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -144,7 +145,9 @@ public class TaskTracker {
 			}
 			file = tracker_status.findOne(name + "_" + collection + "_links");
 			if (file != null){
-				requestQueue.load(file.getInputStream());
+				byte[] data = SystemUtil.inputStreamToBytes(file.getInputStream());
+				System.out.println("linksData len = " + data.length);
+				requestQueue.load(new ByteArrayInputStream(data));
 			}
 		}
 	}
@@ -355,8 +358,11 @@ public class TaskTracker {
 				e.printStackTrace();
 			}
 		}
+		logger.info("downloaderTracker closed");
 		if (backupRunnable != null){
+			logger.info("begin backup stats");
 			backupRunnable.close();
+			logger.info("backup stats finished");
 		}
 		if (requestQueue instanceof Closeable) {
 			Closeable closeable = (Closeable) requestQueue;

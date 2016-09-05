@@ -11,6 +11,7 @@ import com.mongodb.gridfs.GridFSInputFile;
 import banana.core.filter.Filter;
 import banana.core.protocol.Task;
 import banana.core.queue.BlockingRequestQueue;
+import banana.core.queue.DelayedPriorityBlockingQueue;
 import banana.core.request.StartContext;
 import banana.master.impl.CrawlerMasterServer;
 
@@ -88,8 +89,7 @@ public class BackupRunnable extends TimerTask implements Closeable {
 		GridFS tracker_status = new GridFS(CrawlerMasterServer.getInstance().db,"tracker_stat");
 		String filename = config.name + "_" + config.collection + "_links";
 		tracker_status.remove(filename);
-		InputStream input = requestQueue.getStream();
-		GridFSInputFile file = tracker_status.createFile(input);
+		GridFSInputFile file = tracker_status.createFile(requestQueue.toBytes());
 		file.setFilename(filename);
 		file.save();
 	}
@@ -97,9 +97,9 @@ public class BackupRunnable extends TimerTask implements Closeable {
 
 	@Override
 	public void close(){
+		timer.cancel();
 		run();
 		backupLinks();
-		timer.cancel();
 	}
 
 }
