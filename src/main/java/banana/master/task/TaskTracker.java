@@ -63,8 +63,13 @@ public class TaskTracker {
 		initFilter(config.filter);
 		initQueue(config.queue);
 		setBackup();
+		initSeedRequest();
 		initPreviousState(config.synchronizeStat, config.name, config.collection);
 		logger.info(String.format("TaskTracker %s use filter %s queue %s", taskId, filter.getClass().getName(), requestQueue.getClass().getName()));
+		Iterator<HttpRequest> iter = requestQueue.iterator();
+		while(iter.hasNext()) {
+			logger.info(String.format("seed %s", iter.next().getUrl()));
+		}
 	}
 	
 	private void setBackup(){
@@ -195,7 +200,6 @@ public class TaskTracker {
 		if (downloads.isEmpty()) {
 			throw new Exception("Not set any downloader");
 		}
-		initSeedRequest();
 		for (RemoteDownloaderTracker taskDownload : downloads) {
 			taskDownload.setTaskTracker(this);
 			taskDownload.start();
@@ -300,9 +304,10 @@ public class TaskTracker {
 		}
 		if (isAllWaiting() && requestQueue.isEmpty()) {
 			synchronized (this) {
+				System.out.println("synchronized tasktracker " + Thread.currentThread().getName());
 				if (requestQueue.isEmpty()){
 					loopCount ++;
-					if (loopCount == config.loops){
+					if (loopCount >= config.loops){
 						destoryTask();
 					}else{
 						logger.info(String.format("finish loop The %d times", loopCount));
@@ -346,33 +351,40 @@ public class TaskTracker {
 		}
 		return false;
 	}
-
 	/**
 	 * 任务完成销毁任务
 	 */
 	public final void destoryTask() {
-		for (RemoteDownloaderTracker taskDownload : downloads) {
-			try {
-				taskDownload.stop();
-			} catch (DownloadException e) {
-				e.printStackTrace();
-			}
-		}
-		logger.info("downloaderTracker closed");
-		if (backupRunnable != null){
-			logger.info("begin backup stats");
-			backupRunnable.close();
-			logger.info("backup stats finished");
-		}
-		if (requestQueue instanceof Closeable) {
-			Closeable closeable = (Closeable) requestQueue;
-			try {
-				closeable.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-		CrawlerMasterServer.getInstance().removeTask(taskId);
-		logger.info(config.name + " 完成销毁");
+		new Thread(){
+			public void run() {
+				if (downloads == null){
+					return;
+				}
+				for (RemoteDownloaderTracker taskDownload : downloads) {
+					try {
+						taskDownload.stop();
+					} catch (DownloadException e) {
+						e.printStackTrace();
+					}
+				}
+				logger.info("downloaderTracker closed");
+				if (backupRunnable != null){
+					logger.info("begin backup stats");
+					backupRunnable.close();
+					logger.info("backup stats finished");
+				}
+				if (requestQueue instanceof Closeable) {
+					Closeable closeable = (Closeable) requestQueue;
+					try {
+						closeable.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+				CrawlerMasterServer.getInstance().removeTask(taskId);
+				logger.info(config.name + " 完成销毁");
+				downloads = null;
+			};
+		}.start();
 	}
 }

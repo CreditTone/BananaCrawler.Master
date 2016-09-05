@@ -320,6 +320,7 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 
 	@Override
 	public void stopTask(String taskname) throws Exception {
+		System.out.println("stopTask");
 		for (TaskTracker tracker : tasks.values()) {
 			if (taskname.equals(tracker.getTaskName())){
 				tracker.destoryTask();
