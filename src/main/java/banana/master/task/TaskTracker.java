@@ -87,22 +87,30 @@ public class TaskTracker {
 	
 	private void initSeed(List<Task.Seed> seeds){
 		for (Task.Seed seed : seeds) {
-			PageRequest req = context.createPageRequest(seed.getUrl(), seed.getProcessor());
-			if (seed.getMethod() == null || "GET".equalsIgnoreCase(seed.getMethod())){
-				req.setMethod(HttpRequest.Method.GET);
+			String[] urls = null;
+			if (seed.getUrl() != null){
+				urls = new String[]{seed.getUrl()};
 			}else{
-				req.setMethod(HttpRequest.Method.POST);
-				Map<String,String> params = seed.getParams();
-				for (Map.Entry<String, String> valuePair : params.entrySet()){
-					req.putParams(valuePair.getKey(), valuePair.getValue());
-				}
+				urls = seed.getUrls();
 			}
-			if (seed.getHeaders() != null){
-				for (Map.Entry<String, String> valuePair : seed.getHeaders().entrySet()) {
-					req.putHeader(valuePair.getKey(), valuePair.getValue());
+			for (int i = 0; i < urls.length; i++) {
+				PageRequest req = context.createPageRequest(urls[i], seed.getProcessor());
+				if (seed.getMethod() == null || "GET".equalsIgnoreCase(seed.getMethod())){
+					req.setMethod(HttpRequest.Method.GET);
+				}else{
+					req.setMethod(HttpRequest.Method.POST);
+					Map<String,String> params = seed.getParams();
+					for (Map.Entry<String, String> valuePair : params.entrySet()){
+						req.putParams(valuePair.getKey(), valuePair.getValue());
+					}
 				}
+				if (seed.getHeaders() != null){
+					for (Map.Entry<String, String> valuePair : seed.getHeaders().entrySet()) {
+						req.putHeader(valuePair.getKey(), valuePair.getValue());
+					}
+				}
+				context.injectSeed(req);
 			}
-			context.injectSeed(req);
 		}
 	}
 	

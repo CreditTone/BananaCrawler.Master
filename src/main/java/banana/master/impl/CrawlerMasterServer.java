@@ -167,8 +167,8 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 			return;
 		}
 		TaskTracker tracker = new TaskTracker(config);
-		tracker.start();
 		tasks.put(tracker.getId(), tracker);
+		tracker.start();
 	}
 	
 	private boolean isResubmit(Task config) throws Exception {
