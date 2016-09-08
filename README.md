@@ -1,7 +1,6 @@
 Banana分布式爬虫使用手册
-说明：
 ========
->新版文档地址[http://webmagic.io/docs/](http://webmagic.io/docs/)，此手册已不再更新。
+>BananaCrawler是一个高度配置文件化的分布式爬虫，其功能支持task配置、提交、自动抓取、自动入库、自动索引等全方位功能。此外分布式搭建也十分简单，架构清晰，作者来自国内某上市互联网金融公司（全球p2p第一的称号）。现开源为广大爬虫工程师和创业公司提供快速构建爬虫系统作出一点贡献。
 
 <div style="page-break-after:always"></div>
 
