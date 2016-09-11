@@ -71,8 +71,21 @@ public class StartMaster {
 				System.out.print("Do you need to remove before fetching result?\nConfirm the input y/yes:");
 				String yes = scan.next();
 				if (yes.equalsIgnoreCase("Y") || yes.equalsIgnoreCase("YES")){
-					int n = proxy.removeBeforeResult(task.collection, task.name).get();
-					System.out.println("Delete article " + n);
+					String password = null;
+					for (int i = 0; i < 3; i++) {
+						System.out.print("password:");
+						password = scan.next();
+						if (password.equals("jisucloud")){
+							int n = proxy.removeBeforeResult(task.collection, task.name).get();
+							System.out.println("Delete article " + n);
+							break;
+						}else{
+							System.out.println("password error.");
+							if (i == 3){
+								return;
+							}
+						}
+					}
 				}
 			}
 			if (!resubmit && proxy.statExists(task.collection, task.name).get()){

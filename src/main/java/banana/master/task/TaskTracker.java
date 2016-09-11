@@ -25,6 +25,7 @@ import banana.core.queue.BlockingRequestQueue;
 import banana.core.queue.RequestQueueBuilder;
 import banana.core.request.HttpRequest;
 import banana.core.request.PageRequest;
+import banana.core.request.RequestBuilder;
 import banana.core.request.StartContext;
 import banana.core.util.SystemUtil;
 import banana.master.impl.CrawlerMasterServer;
@@ -94,7 +95,7 @@ public class TaskTracker {
 				urls = seed.getUrls();
 			}
 			for (int i = 0; i < urls.length; i++) {
-				PageRequest req = context.createPageRequest(urls[i], seed.getProcessor());
+				PageRequest req = RequestBuilder.createPageRequest(urls[i], seed.getProcessor());
 				if (seed.getMethod() == null || "GET".equalsIgnoreCase(seed.getMethod())){
 					req.setMethod(HttpRequest.Method.GET);
 				}else{
