@@ -16,6 +16,7 @@ import org.apache.log4j.Logger;
 import com.mongodb.gridfs.GridFS;
 import com.mongodb.gridfs.GridFSDBFile;
 
+import banana.core.ExpandHandlebars;
 import banana.core.exception.DownloadException;
 import banana.core.filter.Filter;
 import banana.core.filter.NotFilter;
@@ -56,7 +57,7 @@ public class TaskTracker {
 	
 	private BackupRunnable backupRunnable;
 	
-	public TaskTracker(Task taskConfig) {
+	public TaskTracker(Task taskConfig) throws IOException {
 		config = taskConfig;
 		taskId = taskConfig.name + "_" + new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
 		context = new StartContext();
@@ -86,27 +87,33 @@ public class TaskTracker {
 		backupRunnable.setRequestQueue(requestQueue);
 	}
 	
-	private void initSeed(List<Task.Seed> seeds){
+	private void initSeed(List<Task.Seed> seeds) throws IOException{
 		for (Task.Seed seed : seeds) {
 			String[] urls = null;
-			if (seed.getUrl() != null){
-				urls = new String[]{seed.getUrl()};
+			if (seed.url != null){
+				urls = new String[]{seed.url};
+			}else if (seed.urls != null){
+				urls = seed.urls;
 			}else{
-				urls = seed.getUrls();
+				List<Map<String,Object>> dataUrls = new ExpandHandlebars().toFor(seed.url_iterator);
+				urls = new String[dataUrls.size()];
+				for (int i = 0; i < urls.length; i++) {
+					urls[i] = (String) dataUrls.get(i).get("url");
+				}
 			}
 			for (int i = 0; i < urls.length; i++) {
-				PageRequest req = RequestBuilder.createPageRequest(urls[i], seed.getProcessor());
-				if (seed.getMethod() == null || "GET".equalsIgnoreCase(seed.getMethod())){
+				PageRequest req = RequestBuilder.createPageRequest(urls[i], seed.processor);
+				if (seed.method == null || "GET".equalsIgnoreCase(seed.method)){
 					req.setMethod(HttpRequest.Method.GET);
 				}else{
 					req.setMethod(HttpRequest.Method.POST);
-					Map<String,String> params = seed.getParams();
+					Map<String,String> params = seed.params;
 					for (Map.Entry<String, String> valuePair : params.entrySet()){
 						req.putParams(valuePair.getKey(), valuePair.getValue());
 					}
 				}
-				if (seed.getHeaders() != null){
-					for (Map.Entry<String, String> valuePair : seed.getHeaders().entrySet()) {
+				if (seed.headers != null){
+					for (Map.Entry<String, String> valuePair : seed.headers.entrySet()) {
 						req.putHeader(valuePair.getKey(), valuePair.getValue());
 					}
 				}
