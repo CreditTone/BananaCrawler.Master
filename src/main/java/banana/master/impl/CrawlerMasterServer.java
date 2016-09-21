@@ -133,7 +133,7 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		TaskTracker task = tasks.get(taskId);
 		try {
 			return task.pollRequest();
-		} catch (InterruptedException e) {
+		} catch (Exception e) {
 			logger.warn("System error",e);
 		}
 		return null;
