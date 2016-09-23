@@ -4,12 +4,10 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.apache.commons.math3.ode.ExpandableStatefulODE;
 
 import com.github.jknack.handlebars.Template;
 import com.mongodb.BasicDBObject;
@@ -18,6 +16,7 @@ import com.mongodb.DBCursor;
 import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoCredential;
+import com.mongodb.QueryOperators;
 import com.mongodb.ServerAddress;
 import com.mongodb.util.JSON;
 
@@ -43,10 +42,10 @@ public class SeedGenerator {
 	public SeedGenerator(String collection,banana.core.protocol.Task.SeedGenerator seed_generator){
 		this.collection = collection;
 		this.seed_generator = seed_generator;
-		HashMap<String,Object> querys = (HashMap<String, Object>) seed_generator.find.get("ref");
+		Map<String,Object> querys = (Map<String, Object>) seed_generator.find.get("ref");
 		ref = new BasicDBObject(querys);
 		if (seed_generator.find.containsKey("keys")){
-			keys = new BasicDBObject((HashMap<String, Object>)seed_generator.find.get("keys"));
+			keys = new BasicDBObject((Map<String, Object>)seed_generator.find.get("keys"));
 		}
 		if (seed_generator.find.containsKey("limit")){
 			limit = (int) seed_generator.find.get("limit");
@@ -54,7 +53,8 @@ public class SeedGenerator {
 		
 	}
 	
-	public List<PageRequest> query() throws IOException{
+	public List<PageRequest> query() throws Exception{
+		Thread.sleep(10 * 1000);
 		List<PageRequest> result = new ArrayList<PageRequest>();
 		if (!canQuery){
 			return result;
@@ -65,17 +65,26 @@ public class SeedGenerator {
 			return result;
 		}
 		ExpandHandlebars handlebar = new ExpandHandlebars();
-		Template template = null;
-		if (seed_generator.url.contains("{{")){
-			template = handlebar.compileInline(seed_generator.url);
-		}
 		while(cursor.hasNext()){
 			Map<String,Object> dbObject = cursor.next().toMap();
-			String url = template != null? template.apply(dbObject):seed_generator.url;
+			String url = handlebar.escapeParse(seed_generator.url, dbObject);
 			PageRequest request = RequestBuilder.createPageRequest(url, seed_generator.processor);
 			dbObject.remove("_id");
 			for(Entry<String,Object> entry : dbObject.entrySet()){
 				request.addAttribute(entry.getKey(), entry.getValue());
+			}
+			request.setMethod(request.getMethod());
+			if (seed_generator.headers != null){
+				for (Entry<String,String> entry : seed_generator.headers.entrySet()) {
+					String value = handlebar.escapeParse(entry.getValue(), dbObject);
+					request.putHeader(entry.getKey(), value);
+				}
+			}
+			if (seed_generator.params != null){
+				for (Entry<String,String> entry : seed_generator.params.entrySet()) {
+					String value = handlebar.escapeParse(entry.getValue(), dbObject);
+					request.putParams(entry.getKey(), value);
+				}
 			}
 			result.add(request);
 		}
@@ -85,26 +94,8 @@ public class SeedGenerator {
 		return result;
 	}
 	
-	public static void main(String[] args) throws NumberFormatException, UnknownHostException {
-		String mongoAddress = "localhost,27017,crawler,crawler,crawler";
-		String[] split = mongoAddress.split(",");
-		MongoClient client = null;
-		ServerAddress serverAddress = new ServerAddress(split[0], Integer.parseInt(split[1]));
-		List<ServerAddress> seeds = new ArrayList<ServerAddress>();
-		seeds.add(serverAddress);
-		String userName = split[3];
-		String dataBase = split[2];
-		String password = split[4];
-		MongoCredential credentials = MongoCredential.createCredential(userName, dataBase,
-				password.toCharArray());
-		client = new MongoClient(seeds, Arrays.asList(credentials));
-		DB db = client.getDB(split[2]);
-		BasicDBObject query = (BasicDBObject) JSON.parse("{isQiye:\"1\"}");
-		//query.append(key, val)
-		DBCursor cursor = db.getCollection("taobaoshoplist").find(query,(DBObject) JSON.parse("{userid:1}")).limit(2);
-		while(cursor.hasNext()){
-			System.out.println(cursor.next());
-		}
+	public final boolean canQuery(){
+		return canQuery;
 	}
 	
 }
