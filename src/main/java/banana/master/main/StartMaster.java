@@ -89,10 +89,10 @@ public class StartMaster {
 				}
 			}
 			if (!resubmit && proxy.statExists(task.collection, task.name).get()){
-				System.out.print("Do you need to synchronize the previous state?\nConfirm the input y/yes:");
+				System.out.print("Do you need to synchronize the previous links?\nConfirm the input y/yes:");
 				String yes = scan.next();
 				if (yes.equalsIgnoreCase("Y") || yes.equalsIgnoreCase("YES")){
-					task.synchronizeStat = true;
+					task.synchronizeLinks = true;
 				}
 			}
 			proxy.submitTask(task);

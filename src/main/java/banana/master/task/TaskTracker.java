@@ -19,6 +19,7 @@ import com.mongodb.gridfs.GridFSDBFile;
 import banana.core.ExpandHandlebars;
 import banana.core.exception.DownloadException;
 import banana.core.filter.Filter;
+import banana.core.filter.MongoDBFilter;
 import banana.core.filter.NotFilter;
 import banana.core.filter.SimpleBloomFilter;
 import banana.core.protocol.Task;
@@ -63,15 +64,12 @@ public class TaskTracker {
 		config = taskConfig;
 		taskId = taskConfig.name + "_" + new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
 		context = new StartContext();
-		initContextSeed(config.seeds, config.seed_generator);
+		initContext(config.seeds, config.seed_generator);
 		initFilter(config.filter);
 		initQueue(config.queue);
 		setBackup();
-		if (config.synchronizeStat){
-			initPreviousState(config.synchronizeStat, config.name, config.collection);
-		}else{
-			initSeedRequest();
-		}
+		initPreviousLinks(config.synchronizeLinks, config.name, config.collection);
+		initSeedToRequestQueue();
 		logger.info(String.format("TaskTracker %s use filter %s queue %s", taskId, filter.getClass().getName(), requestQueue.getClass().getName()));
 		Iterator<HttpRequest> iter = requestQueue.iterator();
 		while(iter.hasNext()) {
@@ -92,7 +90,7 @@ public class TaskTracker {
 		backupRunnable.setRequestQueue(requestQueue);
 	}
 	
-	private void initContextSeed(List<Task.Seed> seeds,Task.SeedGenerator seedGenerator) throws IOException{
+	private void initContext(List<Task.Seed> seeds,Task.SeedGenerator seedGenerator) throws IOException{
 		for (Task.Seed seed : seeds) {
 			String[] urls = null;
 			if (seed.url != null){
@@ -137,6 +135,9 @@ public class TaskTracker {
 			case "simple":
 				filter = new SimpleBloomFilter();
 				break;
+			case "mongo":
+				filter = new MongoDBFilter(filtercfg.key_name, CrawlerMasterServer.getInstance().db.getCollection(config.collection));
+				break;
 			}
 		}
 	}
@@ -157,29 +158,26 @@ public class TaskTracker {
 	}
 	
 
-	private void initPreviousState(boolean synchronizeStat,String name,String collection) throws Exception {
-		if (synchronizeStat){
-			GridFS tracker_status = new GridFS(CrawlerMasterServer.getInstance().db,"tracker_stat");
-			GridFSDBFile file = tracker_status.findOne(name + "_" + collection + "_filter");
-			if (file != null){
-				byte[] filterData = SystemUtil.inputStreamToBytes(file.getInputStream());
-				System.out.println("filterData len = " + filterData.length);
-				filter.load(filterData);
-			}
-			file = tracker_status.findOne(name + "_" + collection + "_context");
-			if (file != null){
-				byte[] contextData = SystemUtil.inputStreamToBytes(file.getInputStream());
-				System.out.println("contextData len = " + contextData.length);
-				context.load(contextData);
-			}
+	private void initPreviousLinks(boolean synchronizeLinks,String name,String collection) throws Exception {
+		GridFS tracker_status = new GridFS(CrawlerMasterServer.getInstance().db,"tracker_stat");
+		GridFSDBFile file = tracker_status.findOne(name + "_" + collection + "_filter");
+		if (file != null){
+			byte[] filterData = SystemUtil.inputStreamToBytes(file.getInputStream());
+			System.out.println("filterData len = " + filterData.length);
+			filter.load(filterData);
+		}
+		file = tracker_status.findOne(name + "_" + collection + "_context");
+		if (file != null){
+			byte[] contextData = SystemUtil.inputStreamToBytes(file.getInputStream());
+			System.out.println("contextData len = " + contextData.length);
+			context.load(contextData);
+		}
+		if (synchronizeLinks){
 			file = tracker_status.findOne(name + "_" + collection + "_links");
 			if (file != null){
 				byte[] data = SystemUtil.inputStreamToBytes(file.getInputStream());
 				System.out.println("linksData len = " + data.length);
 				requestQueue.load(new ByteArrayInputStream(data));
-			}
-			if (requestQueue.isEmpty()){
-				initSeedRequest();
 			}
 		}
 	}
@@ -211,7 +209,10 @@ public class TaskTracker {
 		return result;
 	}
 	
-	private void initSeedRequest() throws Exception {
+	private void initSeedToRequestQueue() throws Exception {
+		if (!requestQueue.isEmpty()){
+			return;
+		}
 		List<HttpRequest> seeds = context.getSeedRequests();
 		for (HttpRequest req : seeds) {
 			requestQueue.add(req);
@@ -340,7 +341,7 @@ public class TaskTracker {
 				System.out.println("synchronized tasktracker " + Thread.currentThread().getName());
 				if (requestQueue.isEmpty()){
 					if (seedGenerator != null && seedGenerator.canQuery()){
-						initSeedRequest();
+						initSeedToRequestQueue();
 						return requestQueue.poll();
 					}
 					loopCount ++;
@@ -348,7 +349,7 @@ public class TaskTracker {
 						destoryTask();
 					}else{
 						logger.info(String.format("finish loop The %d times", loopCount));
-						initSeedRequest();
+						initSeedToRequestQueue();
 					}
 				}
 			}

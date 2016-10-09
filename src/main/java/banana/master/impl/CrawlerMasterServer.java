@@ -10,7 +10,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Timer;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BooleanWritable;
@@ -30,21 +29,14 @@ import com.mongodb.WriteResult;
 import com.mongodb.gridfs.GridFS;
 import com.mongodb.gridfs.GridFSDBFile;
 
-import banana.core.JedisOperator;
-import banana.core.PropertiesNamespace;
 import banana.core.exception.CrawlerMasterException;
-import banana.core.exception.DownloadException;
 import banana.core.protocol.CrawlerMasterProtocol;
 import banana.core.protocol.DownloadProtocol;
 import banana.core.protocol.Task;
-import banana.core.request.BasicRequest;
 import banana.core.request.HttpRequest;
-import banana.core.request.PageRequest;
-import banana.core.request.StartContext;
 import banana.master.RemoteDownload;
 import banana.master.task.RemoteDownloaderTracker;
 import banana.master.task.TaskTracker;
-import redis.clients.jedis.Jedis;
 
 public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	
@@ -320,7 +312,6 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 
 	@Override
 	public void stopTask(String taskname) throws Exception {
-		System.out.println("stopTask");
 		for (TaskTracker tracker : tasks.values()) {
 			if (taskname.equals(tracker.getTaskName())){
 				tracker.destoryTask();
