@@ -33,6 +33,7 @@ import banana.core.exception.CrawlerMasterException;
 import banana.core.protocol.CrawlerMasterProtocol;
 import banana.core.protocol.DownloadProtocol;
 import banana.core.protocol.Task;
+import banana.core.request.Cookies;
 import banana.core.request.HttpRequest;
 import banana.master.RemoteDownload;
 import banana.master.task.RemoteDownloaderTracker;
@@ -317,6 +318,14 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 				tracker.destoryTask();
 				break;
 			}
+		}
+	}
+
+	@Override
+	public void injectCookies(Cookies cookies, String taskId) throws Exception {
+		TaskTracker task = tasks.get(taskId);
+		if (task != null){
+			
 		}
 	}
 	

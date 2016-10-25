@@ -25,6 +25,7 @@ import banana.core.filter.SimpleBloomFilter;
 import banana.core.protocol.Task;
 import banana.core.queue.BlockingRequestQueue;
 import banana.core.queue.RequestQueueBuilder;
+import banana.core.request.BinaryRequest;
 import banana.core.request.HttpRequest;
 import banana.core.request.PageRequest;
 import banana.core.request.RequestBuilder;
@@ -97,15 +98,39 @@ public class TaskTracker {
 				urls = new String[]{seed.url};
 			}else if (seed.urls != null){
 				urls = seed.urls;
-			}else{
+			}else if (seed.url_iterator != null && !seed.url_iterator.isEmpty()){
 				List<Map<String,Object>> dataUrls = new ExpandHandlebars().toFor(seed.url_iterator);
 				urls = new String[dataUrls.size()];
 				for (int i = 0; i < urls.length; i++) {
 					urls[i] = (String) dataUrls.get(i).get("url");
 				}
 			}
-			for (int i = 0; i < urls.length; i++) {
+			for (int i = 0; urls != null && i < urls.length; i++) {
 				PageRequest req = RequestBuilder.createPageRequest(urls[i], seed.processor);
+				if (seed.method == null || "GET".equalsIgnoreCase(seed.method)){
+					req.setMethod(HttpRequest.Method.GET);
+				}else{
+					req.setMethod(HttpRequest.Method.POST);
+					Map<String,String> params = seed.params;
+					for (Map.Entry<String, String> valuePair : params.entrySet()){
+						req.putParams(valuePair.getKey(), valuePair.getValue());
+					}
+				}
+				if (seed.headers != null){
+					for (Map.Entry<String, String> valuePair : seed.headers.entrySet()) {
+						req.putHeader(valuePair.getKey(), valuePair.getValue());
+					}
+				}
+				context.injectSeed(req);
+			}
+			String[] downloads = null;
+			if (seed.download != null){
+				urls = new String[]{seed.download};
+			}else if (seed.downloads != null){
+				urls = seed.downloads;
+			}
+			for (int i = 0; downloads != null && i < downloads.length; i++) {
+				BinaryRequest req = RequestBuilder.createBinaryRequest(downloads[i], "");
 				if (seed.method == null || "GET".equalsIgnoreCase(seed.method)){
 					req.setMethod(HttpRequest.Method.GET);
 				}else{
@@ -218,7 +243,7 @@ public class TaskTracker {
 			requestQueue.add(req);
 		}
 		if (seedGenerator != null){
-			List<PageRequest> generators = seedGenerator.query();
+			List<HttpRequest> generators = seedGenerator.query();
 			for (HttpRequest req : generators) {
 				requestQueue.add(req);
 			}

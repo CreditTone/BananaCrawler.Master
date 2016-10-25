@@ -1,26 +1,17 @@
 package banana.master.task;
 
-import java.io.IOException;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
 
-import com.github.jknack.handlebars.Template;
 import com.mongodb.BasicDBObject;
-import com.mongodb.DB;
 import com.mongodb.DBCursor;
 import com.mongodb.DBObject;
-import com.mongodb.MongoClient;
-import com.mongodb.MongoCredential;
-import com.mongodb.QueryOperators;
-import com.mongodb.ServerAddress;
-import com.mongodb.util.JSON;
 
 import banana.core.ExpandHandlebars;
+import banana.core.request.HttpRequest;
 import banana.core.request.PageRequest;
 import banana.core.request.RequestBuilder;
 import banana.master.impl.CrawlerMasterServer;
@@ -53,9 +44,9 @@ public class SeedGenerator {
 		
 	}
 	
-	public List<PageRequest> query() throws Exception{
+	public List<HttpRequest> query() throws Exception{
 		Thread.sleep(10 * 1000);
-		List<PageRequest> result = new ArrayList<PageRequest>();
+		List<HttpRequest> result = new ArrayList<HttpRequest>();
 		if (!canQuery){
 			return result;
 		}
@@ -67,8 +58,15 @@ public class SeedGenerator {
 		ExpandHandlebars handlebar = new ExpandHandlebars();
 		while(cursor.hasNext()){
 			Map<String,Object> dbObject = cursor.next().toMap();
-			String url = handlebar.escapeParse(seed_generator.url, dbObject);
-			PageRequest request = RequestBuilder.createPageRequest(url, seed_generator.processor);
+			HttpRequest request = null;
+			String url = null;
+			if (seed_generator.url != null){
+				url = handlebar.escapeParse(seed_generator.url, dbObject);
+				request = RequestBuilder.createPageRequest(url, seed_generator.processor);
+			}else if(seed_generator.download != null){
+				url = handlebar.escapeParse(seed_generator.download, dbObject);
+				request = RequestBuilder.createBinaryRequest(url, seed_generator.processor);
+			}
 			dbObject.remove("_id");
 			for(Entry<String,Object> entry : dbObject.entrySet()){
 				request.addAttribute(entry.getKey(), entry.getValue());
