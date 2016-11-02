@@ -51,7 +51,7 @@ public class TaskTracker {
 
 	private BlockingRequestQueue requestQueue;
 	
-	private SeedGenerator seedGenerator;
+	private SeedQuerys seedQuerys;
 
 	private StartContext context;
 
@@ -65,7 +65,7 @@ public class TaskTracker {
 		config = taskConfig;
 		taskId = taskConfig.name + "_" + new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
 		context = new StartContext();
-		initContext(config.seeds, config.seed_generator);
+		initContext(config.seeds, config.seed_query);
 		initFilter(config.filter);
 		initQueue(config.queue);
 		setBackup();
@@ -91,7 +91,7 @@ public class TaskTracker {
 		backupRunnable.setRequestQueue(requestQueue);
 	}
 	
-	private void initContext(List<Task.Seed> seeds,Task.SeedGenerator seedGenerator) throws IOException{
+	private void initContext(List<Task.Seed> seeds,Task.SeedQuery seedQuery) throws IOException{
 		for (Task.Seed seed : seeds) {
 			String[] urls = null;
 			if (seed.url != null){
@@ -148,8 +148,8 @@ public class TaskTracker {
 				context.injectSeed(req);
 			}
 		}
-		if (seedGenerator != null){
-			this.seedGenerator = new SeedGenerator(config.collection, seedGenerator);
+		if (seedQuery != null){
+			this.seedQuerys = new SeedQuerys(config.collection, seedQuery);
 		}
 	}
 	
@@ -242,8 +242,8 @@ public class TaskTracker {
 		for (HttpRequest req : seeds) {
 			requestQueue.add(req);
 		}
-		if (seedGenerator != null){
-			List<HttpRequest> generators = seedGenerator.query();
+		if (seedQuerys != null){
+			List<HttpRequest> generators = seedQuerys.query();
 			for (HttpRequest req : generators) {
 				requestQueue.add(req);
 			}
@@ -365,7 +365,7 @@ public class TaskTracker {
 			synchronized (this) {
 				System.out.println("synchronized tasktracker " + Thread.currentThread().getName());
 				if (requestQueue.isEmpty()){
-					if (seedGenerator != null && seedGenerator.canQuery()){
+					if (seedQuerys != null && seedQuerys.canQuery()){
 						initSeedToRequestQueue();
 						return requestQueue.poll();
 					}

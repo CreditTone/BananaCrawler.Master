@@ -16,9 +16,9 @@ import banana.core.request.PageRequest;
 import banana.core.request.RequestBuilder;
 import banana.master.impl.CrawlerMasterServer;
 
-public class SeedGenerator {
+public class SeedQuerys {
 	
-	public banana.core.protocol.Task.SeedGenerator seed_generator;
+	public banana.core.protocol.Task.SeedQuery seed_query;
 	
 	private String collection;
 	
@@ -30,16 +30,16 @@ public class SeedGenerator {
 	
 	private boolean canQuery = true;
 	
-	public SeedGenerator(String collection,banana.core.protocol.Task.SeedGenerator seed_generator){
+	public SeedQuerys(String collection,banana.core.protocol.Task.SeedQuery seed_query){
 		this.collection = collection;
-		this.seed_generator = seed_generator;
-		Map<String,Object> querys = (Map<String, Object>) seed_generator.find.get("ref");
+		this.seed_query = seed_query;
+		Map<String,Object> querys = (Map<String, Object>) seed_query.find.get("ref");
 		ref = new BasicDBObject(querys);
-		if (seed_generator.find.containsKey("keys")){
-			keys = new BasicDBObject((Map<String, Object>)seed_generator.find.get("keys"));
+		if (seed_query.find.containsKey("keys")){
+			keys = new BasicDBObject((Map<String, Object>)seed_query.find.get("keys"));
 		}
-		if (seed_generator.find.containsKey("limit")){
-			limit = (int) seed_generator.find.get("limit");
+		if (seed_query.find.containsKey("limit")){
+			limit = (int) seed_query.find.get("limit");
 		}
 		
 	}
@@ -60,33 +60,33 @@ public class SeedGenerator {
 			Map<String,Object> dbObject = cursor.next().toMap();
 			HttpRequest request = null;
 			String url = null;
-			if (seed_generator.url != null){
-				url = handlebar.escapeParse(seed_generator.url, dbObject);
-				request = RequestBuilder.createPageRequest(url, seed_generator.processor);
-			}else if(seed_generator.download != null){
-				url = handlebar.escapeParse(seed_generator.download, dbObject);
-				request = RequestBuilder.createBinaryRequest(url, seed_generator.processor);
+			if (seed_query.url != null){
+				url = handlebar.escapeParse(seed_query.url, dbObject);
+				request = RequestBuilder.createPageRequest(url, seed_query.processor);
+			}else if(seed_query.download != null){
+				url = handlebar.escapeParse(seed_query.download, dbObject);
+				request = RequestBuilder.createBinaryRequest(url, seed_query.processor);
 			}
 			dbObject.remove("_id");
 			for(Entry<String,Object> entry : dbObject.entrySet()){
 				request.addAttribute(entry.getKey(), entry.getValue());
 			}
 			request.setMethod(request.getMethod());
-			if (seed_generator.headers != null){
-				for (Entry<String,String> entry : seed_generator.headers.entrySet()) {
+			if (seed_query.headers != null){
+				for (Entry<String,String> entry : seed_query.headers.entrySet()) {
 					String value = handlebar.escapeParse(entry.getValue(), dbObject);
 					request.putHeader(entry.getKey(), value);
 				}
 			}
-			if (seed_generator.params != null){
-				for (Entry<String,String> entry : seed_generator.params.entrySet()) {
+			if (seed_query.params != null){
+				for (Entry<String,String> entry : seed_query.params.entrySet()) {
 					String value = handlebar.escapeParse(entry.getValue(), dbObject);
 					request.putParams(entry.getKey(), value);
 				}
 			}
 			result.add(request);
 		}
-		if (!seed_generator.keep){
+		if (!seed_query.keep){
 			canQuery = false;
 		}
 		return result;
