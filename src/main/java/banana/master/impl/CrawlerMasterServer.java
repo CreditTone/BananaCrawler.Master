@@ -4,12 +4,16 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.rmi.RemoteException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Timer;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BooleanWritable;
@@ -37,6 +41,7 @@ import banana.core.request.Cookies;
 import banana.core.request.HttpRequest;
 import banana.master.RemoteDownload;
 import banana.master.task.RemoteDownloaderTracker;
+import banana.master.task.TaskTimer;
 import banana.master.task.TaskTracker;
 
 public final class CrawlerMasterServer implements CrawlerMasterProtocol {
@@ -52,19 +57,22 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	
 	private Map<String,Text> masterProperties = new HashMap<String,Text>();
 	
-	private Map<String,TaskTracker> tasks = new HashMap<String, TaskTracker>();
+	public Map<String,TaskTracker> tasks = new HashMap<String, TaskTracker>();
+	
+	private List<TaskTimer> timers = new ArrayList<TaskTimer>();
 	
 	private List<RemoteDownload> downloads = new ArrayList<RemoteDownload>();
 	
 	public DB db;
+	
+	public Connection jdbcConnection;
 	
 	public CrawlerMasterServer() throws RemoteException {
 		super();
 		master = this;
 	}
 	
-	public void init() throws NumberFormatException, UnknownHostException{
-//			JedisOperator jedisOperator = JedisOperator.newInstance(redisHost, redisPort);
+	public void init() throws NumberFormatException, UnknownHostException, SQLException{
 		String mongoAddress = masterProperties.get("MONGO").toString();
 		String[] split = mongoAddress.split(",");
 		MongoClient client = null;
@@ -78,6 +86,16 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 				password.toCharArray());
 		client = new MongoClient(seeds, Arrays.asList(credentials));
 		db = client.getDB(split[2]);
+		if (masterProperties.containsKey("JDBC")){
+			try{   
+			    //加载MySql的驱动类   
+			    Class.forName("com.mysql.jdbc.Driver") ;   
+			}catch(ClassNotFoundException e){   
+			   	System.out.println("找不到驱动程序类 ，加载驱动失败！");   
+			    e.printStackTrace();
+			}    
+			jdbcConnection = DriverManager.getConnection(masterProperties.get("JDBC").toString());
+		}
 	}
 	
 	public static final CrawlerMasterServer getInstance(){
@@ -159,15 +177,26 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		if (isResubmit(config)){
 			return;
 		}
-		TaskTracker tracker = new TaskTracker(config);
-		tasks.put(tracker.getId(), tracker);
-		tracker.start();
+		if (config.timer != null){
+			TaskTimer taskTimer = new TaskTimer(config);
+			timers.add(taskTimer);
+			taskTimer.start();
+		}else{
+			TaskTracker tracker = new TaskTracker(config);
+			tasks.put(tracker.getId(), tracker);
+			tracker.start();
+		}
 	}
 	
 	private boolean isResubmit(Task config) throws Exception {
 		for (TaskTracker tracker : tasks.values()) {
 			if (config.name.equals(tracker.getTaskName())){
 				tracker.updateConfig(config);
+				return true;
+			}
+		}
+		for (TaskTimer timer : timers) {
+			if (config.name.equals(timer.cfg.name)){
 				return true;
 			}
 		}

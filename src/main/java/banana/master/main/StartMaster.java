@@ -32,6 +32,7 @@ public class StartMaster {
 		options.addOption("st", "stoptask", true, "stop a task");
 		options.addOption("e", "extractor", true, "Set the extractor host");
 		options.addOption("mdb", "mongodb", true, "Set the mongodb host and username/password");
+		options.addOption("mysql", "mysql", true, "Set the mysql jdbc url");
 		options.addOption("t", "test", true, "test task from a jsonfile");
 		CommandLine commandLine = parser.parse(options, args);
 		HelpFormatter formatter = new HelpFormatter();
@@ -105,9 +106,11 @@ public class StartMaster {
 			return;
 		}
 		String mongoAddress = commandLine.getOptionValue("mdb");
+		String jdbcUrl = commandLine.getOptionValue("mysql");
 		String extractorAddress = commandLine.getOptionValue("e");
 		CrawlerMasterServer crawlerMasterServer = new CrawlerMasterServer();
 		crawlerMasterServer.setMasterPropertie("MONGO", mongoAddress);
+		crawlerMasterServer.setMasterPropertie("JDBC", jdbcUrl);
 		crawlerMasterServer.setMasterPropertie("EXTRACTOR", extractorAddress);
 		crawlerMasterServer.init();
 		if (crawlerMasterServer != null) {
@@ -121,7 +124,7 @@ public class StartMaster {
 
 	public static Task initOneTask(String path) throws IOException {
 		File file = new File(path);
-		String json = FileUtils.readFileToString(file, "utf-8");
+		String json = FileUtils.readFileToString(file, "UTF-8");
 		Task task = JSON.parseObject(json, Task.class);
 		task.data = json;
 		return task;
