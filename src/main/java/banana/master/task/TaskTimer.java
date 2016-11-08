@@ -46,6 +46,10 @@ public class TaskTimer extends java.util.TimerTask{
 		this.timer.schedule(this, firstTime, period);
 	}
 	
+	public void stop(){
+		this.timer.cancel();
+	}
+	
 	@Override
 	public void run() {
 		try {

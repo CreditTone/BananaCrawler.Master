@@ -179,6 +179,12 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		}
 		if (config.timer != null){
 			TaskTimer taskTimer = new TaskTimer(config);
+			for(TaskTimer timer : timers){
+				if (timer.cfg.name.equals(config.name)){
+					timers.remove(timer);
+					timer.stop();
+				}
+			}
 			timers.add(taskTimer);
 			taskTimer.start();
 		}else{
@@ -192,11 +198,6 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		for (TaskTracker tracker : tasks.values()) {
 			if (config.name.equals(tracker.getTaskName())){
 				tracker.updateConfig(config);
-				return true;
-			}
-		}
-		for (TaskTimer timer : timers) {
-			if (config.name.equals(timer.cfg.name)){
 				return true;
 			}
 		}
