@@ -106,7 +106,7 @@ public class TaskTracker {
 				}
 			}
 			for (int i = 0; urls != null && i < urls.length; i++) {
-				PageRequest req = RequestBuilder.createPageRequest(urls[i], seed.processor);
+				HttpRequest req = RequestBuilder.custom().setUrl(urls[i]).setProcessor(seed.processor).build();
 				if (seed.method == null || "GET".equalsIgnoreCase(seed.method)){
 					req.setMethod(HttpRequest.Method.GET);
 				}else{
@@ -130,7 +130,7 @@ public class TaskTracker {
 				urls = seed.downloads;
 			}
 			for (int i = 0; downloads != null && i < downloads.length; i++) {
-				BinaryRequest req = RequestBuilder.createBinaryRequest(downloads[i], "");
+				HttpRequest req = RequestBuilder.custom().setDownload(downloads[i]).setProcessor("").build();
 				if (seed.method == null || "GET".equalsIgnoreCase(seed.method)){
 					req.setMethod(HttpRequest.Method.GET);
 				}else{
@@ -161,7 +161,7 @@ public class TaskTracker {
 				filter = new SimpleBloomFilter();
 				break;
 			case "mongo":
-				filter = new MongoDBFilter(filtercfg.key_name, CrawlerMasterServer.getInstance().db.getCollection(config.collection));
+				filter = new MongoDBFilter(filtercfg.key_name, CrawlerMasterServer.getInstance().getMongoDB().getCollection(config.collection));
 				break;
 			}
 		}
@@ -184,7 +184,7 @@ public class TaskTracker {
 	
 
 	private void initPreviousLinks(boolean synchronizeLinks,String name,String collection) throws Exception {
-		GridFS tracker_status = new GridFS(CrawlerMasterServer.getInstance().db,"tracker_stat");
+		GridFS tracker_status = new GridFS(CrawlerMasterServer.getInstance().getMongoDB(),"tracker_stat");
 		GridFSDBFile file = tracker_status.findOne(name + "_" + collection + "_filter");
 		if (file != null){
 			byte[] filterData = SystemUtil.inputStreamToBytes(file.getInputStream());

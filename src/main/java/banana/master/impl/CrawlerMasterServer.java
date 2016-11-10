@@ -34,6 +34,7 @@ import com.mongodb.gridfs.GridFS;
 import com.mongodb.gridfs.GridFSDBFile;
 
 import banana.core.exception.CrawlerMasterException;
+import banana.core.modle.MasterConfig;
 import banana.core.protocol.CrawlerMasterProtocol;
 import banana.core.protocol.DownloadProtocol;
 import banana.core.protocol.Task;
@@ -55,7 +56,7 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	
 	private static CrawlerMasterServer master = null;
 	
-	private Map<String,Text> masterProperties = new HashMap<String,Text>();
+	private MasterConfig config;
 	
 	public Map<String,TaskTracker> tasks = new HashMap<String, TaskTracker>();
 	
@@ -63,30 +64,41 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	
 	private List<RemoteDownload> downloads = new ArrayList<RemoteDownload>();
 	
-	public DB db;
+	private DB db;
 	
-	public Connection jdbcConnection;
+	private Connection jdbcConnection;
 	
-	public CrawlerMasterServer() throws RemoteException {
+	public CrawlerMasterServer(MasterConfig config){
 		super();
+		this.config = config;
 		master = this;
 	}
 	
-	public void init() throws NumberFormatException, UnknownHostException, SQLException{
-		String mongoAddress = masterProperties.get("MONGO").toString();
-		String[] split = mongoAddress.split(",");
-		MongoClient client = null;
-		ServerAddress serverAddress = new ServerAddress(split[0], Integer.parseInt(split[1]));
-		List<ServerAddress> seeds = new ArrayList<ServerAddress>();
-		seeds.add(serverAddress);
-		String userName = split[3];
-		String dataBase = split[2];
-		String password = split[4];
-		MongoCredential credentials = MongoCredential.createCredential(userName, dataBase,
-				password.toCharArray());
-		client = new MongoClient(seeds, Arrays.asList(credentials));
-		db = client.getDB(split[2]);
-		if (masterProperties.containsKey("JDBC")){
+	public static final CrawlerMasterServer getInstance(){
+		return master;
+	}
+	
+	public DB getMongoDB(){
+		if (db == null){
+			MongoClient client = null;
+			ServerAddress serverAddress;
+			try {
+				serverAddress = new ServerAddress(config.mongodb.host, config.mongodb.port);
+				List<ServerAddress> seeds = new ArrayList<ServerAddress>();
+				seeds.add(serverAddress);
+				MongoCredential credentials = MongoCredential.createCredential(config.mongodb.username, config.mongodb.db,
+						config.mongodb.password.toCharArray());
+				client = new MongoClient(seeds, Arrays.asList(credentials));
+				db = client.getDB(config.mongodb.db);
+			} catch (Exception e) {
+				logger.info("init mongodb error", e);
+			}
+		}
+		return db;
+	}
+	
+	public Connection getSqlConnection() throws SQLException{
+		if (config.jdbc != null && (jdbcConnection == null || jdbcConnection.isClosed())){
 			try{   
 			    //加载MySql的驱动类   
 			    Class.forName("com.mysql.jdbc.Driver") ;   
@@ -94,15 +106,11 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 			   	System.out.println("找不到驱动程序类 ，加载驱动失败！");   
 			    e.printStackTrace();
 			}    
-			jdbcConnection = DriverManager.getConnection(masterProperties.get("JDBC").toString());
+			jdbcConnection = DriverManager.getConnection(config.jdbc);
 		}
+		return jdbcConnection;
 	}
 	
-	public static final CrawlerMasterServer getInstance(){
-		return master;
-	}
-
-
 	public void registerDownloadNode(String remote,int port) throws CrawlerMasterException {
 		for (RemoteDownload download : downloads) {
 			if(download.getIp().equals(remote) && port == download.getPort()){
@@ -150,15 +158,6 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		return null;
 	}
 	
-	public void setMasterPropertie(String name,String value){
-		masterProperties.put(name, new Text(value));
-	}
-	
-	@Override
-	public Text getMasterPropertie(String name) {
-		return masterProperties.get(name);
-	}
-
 	@Override
 	public long getProtocolVersion(String protocol, long clientVersion) throws IOException {
 		return CrawlerMasterProtocol.versionID;
@@ -203,7 +202,6 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		}
 		return false;
 	}
-	
 	
 
 	/**
@@ -310,14 +308,14 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	
 	@Override
 	public IntWritable removeBeforeResult(String collection, String taskName) throws Exception {
-		WriteResult result = db.getCollection(collection).remove(new BasicDBObject("_task_name", taskName));
+		WriteResult result = getMongoDB().getCollection(collection).remove(new BasicDBObject("_task_name", taskName));
 		return new IntWritable(result.getN());
 	}
 
 	@Override
 	public BooleanWritable taskdataExists(String collection,String taskName) {
-		if (db.collectionExists(collection)){
-			DBObject obj = db.getCollection(collection).findOne(new BasicDBObject("_task_name", taskName));
+		if (getMongoDB().collectionExists(collection)){
+			DBObject obj = getMongoDB().getCollection(collection).findOne(new BasicDBObject("_task_name", taskName));
 			return new BooleanWritable(obj != null);
 		}
 		return new BooleanWritable(false);
@@ -325,7 +323,7 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 
 	@Override
 	public BooleanWritable statExists(String collection, String taskname) {
-		GridFS tracker_status = new GridFS(db,"tracker_stat");
+		GridFS tracker_status = new GridFS(getMongoDB(),"tracker_stat");
 		GridFSDBFile file = tracker_status.findOne(taskname + "_" + collection + "_filter");
 		return new BooleanWritable(file != null);
 	}
@@ -357,6 +355,11 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		if (task != null){
 			
 		}
+	}
+
+	@Override
+	public MasterConfig getMasterConfig() throws CrawlerMasterException {
+		return config;
 	}
 	
 }

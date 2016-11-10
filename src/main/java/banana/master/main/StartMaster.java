@@ -1,6 +1,7 @@
 package banana.master.main;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Scanner;
@@ -17,6 +18,7 @@ import org.apache.hadoop.ipc.RPC.Server;
 
 import com.alibaba.fastjson.JSON;
 
+import banana.core.modle.MasterConfig;
 import banana.core.protocol.CrawlerMasterProtocol;
 import banana.core.protocol.Task;
 import banana.master.impl.CrawlerMasterServer;
@@ -28,12 +30,9 @@ public class StartMaster {
 		CommandLineParser parser = new DefaultParser();
 		Options options = new Options();
 		options.addOption("h", "help", false, "print this usage information");
+		options.addOption("c", "config", true, "config file");
 		options.addOption("s", "submit", true, "submit task from a jsonfile");
 		options.addOption("st", "stoptask", true, "stop a task");
-		options.addOption("e", "extractor", true, "Set the extractor host");
-		options.addOption("mdb", "mongodb", true, "Set the mongodb host and username/password");
-		options.addOption("mysql", "mysql", true, "Set the mysql jdbc url");
-		options.addOption("t", "test", true, "test task from a jsonfile");
 		CommandLine commandLine = parser.parse(options, args);
 		HelpFormatter formatter = new HelpFormatter();
 		if (commandLine.hasOption('h')) {
@@ -100,26 +99,18 @@ public class StartMaster {
 			System.out.println("Task to run");
 			return;
 		}
-		if (!commandLine.hasOption("mdb") || !commandLine.hasOption("e")) {
-			System.out.println("Must have mongodb、extractor configuration");
-			formatter.printHelp("Master", options);
-			return;
+		//启动master
+		String configFile = StartMaster.class.getClassLoader().getResource("").getPath() + "/master_config.json";
+		if (commandLine.hasOption("c")){
+			configFile = commandLine.getOptionValue("c");
 		}
-		String mongoAddress = commandLine.getOptionValue("mdb");
-		String jdbcUrl = commandLine.getOptionValue("mysql");
-		String extractorAddress = commandLine.getOptionValue("e");
-		CrawlerMasterServer crawlerMasterServer = new CrawlerMasterServer();
-		crawlerMasterServer.setMasterPropertie("MONGO", mongoAddress);
-		crawlerMasterServer.setMasterPropertie("JDBC", jdbcUrl);
-		crawlerMasterServer.setMasterPropertie("EXTRACTOR", extractorAddress);
-		crawlerMasterServer.init();
-		if (crawlerMasterServer != null) {
-			Server server = new RPC.Builder(new Configuration()).setProtocol(CrawlerMasterProtocol.class)
-					.setInstance(crawlerMasterServer).setBindAddress("0.0.0.0").setPort(8666).setNumHandlers(100)
-					.build();
-			server.start();
-			System.out.println("Master已经启动!!!可以陆续启动Downloader来扩展集群了");
-		}
+		MasterConfig config = JSON.parseObject(FileUtils.readFileToString(new File(configFile)),MasterConfig.class);
+		CrawlerMasterServer crawlerMasterServer = new CrawlerMasterServer(config);
+		Server server = new RPC.Builder(new Configuration()).setProtocol(CrawlerMasterProtocol.class)
+				.setInstance(crawlerMasterServer).setBindAddress("0.0.0.0").setPort(config.listen).setNumHandlers(config.handlers)
+				.build();
+		server.start();
+		System.out.println("Master已经启动!!!可以陆续启动Downloader来扩展集群了");
 	}
 
 	public static Task initOneTask(String path) throws IOException {

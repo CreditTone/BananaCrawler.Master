@@ -74,7 +74,7 @@ public class SeedQuerys {
 		Statement statement = null;
 		ResultSet result = null;
 		try{
-			statement = CrawlerMasterServer.getInstance().jdbcConnection.createStatement();
+			statement = CrawlerMasterServer.getInstance().getSqlConnection().createStatement();
 			result = statement.executeQuery(sql);
 			ResultSetMetaData metaData = result.getMetaData();
 			ExpandHandlebars handlebar = new ExpandHandlebars();
@@ -111,7 +111,7 @@ public class SeedQuerys {
 	private List<HttpRequest> mongoDBFind() throws Exception{
 		Thread.sleep(3 * 1000);
 		List<HttpRequest> result = new ArrayList<HttpRequest>();
-		DBCursor cursor = CrawlerMasterServer.getInstance().db.getCollection(collection).find(ref, keys).limit(limit);
+		DBCursor cursor = CrawlerMasterServer.getInstance().getMongoDB().getCollection(collection).find(ref, keys).limit(limit);
 		if (cursor.count() == 0){
 			canQuery = false;
 			return result;
@@ -130,10 +130,10 @@ public class SeedQuerys {
 		String url = null;
 		if (seed_query.url != null){
 			url = handlebar.escapeParse(seed_query.url, context);
-			request = RequestBuilder.createPageRequest(url, seed_query.processor);
+			request = RequestBuilder.custom().setUrl(url).setProcessor(seed_query.processor).build();
 		}else if(seed_query.download != null){
 			url = handlebar.escapeParse(seed_query.download, context);
-			request = RequestBuilder.createBinaryRequest(url, seed_query.processor);
+			request = RequestBuilder.custom().setDownload(url).setProcessor(seed_query.processor).build();
 		}
 		context.remove("_id");
 		for(Entry<String,Object> entry : context.entrySet()){
