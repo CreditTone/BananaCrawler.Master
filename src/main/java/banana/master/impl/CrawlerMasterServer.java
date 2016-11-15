@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -105,7 +106,7 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 			}catch(ClassNotFoundException e){   
 			   	System.out.println("找不到驱动程序类 ，加载驱动失败！");   
 			    e.printStackTrace();
-			}    
+			}
 			jdbcConnection = DriverManager.getConnection(config.jdbc);
 		}
 		return jdbcConnection;
@@ -178,7 +179,9 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		}
 		if (config.timer != null){
 			TaskTimer taskTimer = new TaskTimer(config);
-			for(TaskTimer timer : timers){
+			Iterator<TaskTimer> iter = timers.iterator();
+			while(iter.hasNext()){
+				TaskTimer timer = iter.next();
 				if (timer.cfg.name.equals(config.name)){
 					timers.remove(timer);
 					timer.stop();

@@ -100,11 +100,18 @@ public class StartMaster {
 			return;
 		}
 		//启动master
-		String configFile = StartMaster.class.getClassLoader().getResource("").getPath() + "/master_config.json";
+		File configFile = new File("master_config.json");
 		if (commandLine.hasOption("c")){
-			configFile = commandLine.getOptionValue("c");
+			configFile = new File(commandLine.getOptionValue("c"));
+		}else if (!configFile.exists()){
+			try{
+				configFile = new File(StartMaster.class.getClassLoader().getResource("").getPath() + "/master_config.json");
+			}catch(Exception e){
+				System.out.println("请指定配置文件位置");
+				System.exit(0);
+			}
 		}
-		MasterConfig config = JSON.parseObject(FileUtils.readFileToString(new File(configFile)),MasterConfig.class);
+		MasterConfig config = JSON.parseObject(FileUtils.readFileToString(configFile),MasterConfig.class);
 		CrawlerMasterServer crawlerMasterServer = new CrawlerMasterServer(config);
 		Server server = new RPC.Builder(new Configuration()).setProtocol(CrawlerMasterProtocol.class)
 				.setInstance(crawlerMasterServer).setBindAddress("0.0.0.0").setPort(config.listen).setNumHandlers(config.handlers)
