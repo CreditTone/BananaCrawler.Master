@@ -12,5 +12,5 @@
 		"username":"crawler",
 		"password":"crawler"
 	},
-	"jdbc":"jdbc:mysql://120.132.6.30:3306/jisujie?user=dev&password=123456&useUnicode=true"
+	"jdbc":"jdbc:mysql://127.0.0.1:3306/jisujie?user=dev&password=123456&useUnicode=true"
 }

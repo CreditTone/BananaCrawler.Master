@@ -1,5 +1,5 @@
 /target/
-src/main/resources/master_config.json
+*json
 .settings/
 .project
 .classpath
