@@ -1,7 +1,6 @@
 package banana.master.main;
 
 import java.io.File;
-import java.io.FileFilter;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Scanner;
@@ -14,7 +13,6 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.RPC.Server;
 
 import com.alibaba.fastjson.JSON;
 
