@@ -31,7 +31,7 @@ import banana.core.request.PageRequest;
 import banana.core.request.RequestBuilder;
 import banana.core.request.StartContext;
 import banana.core.util.SystemUtil;
-import banana.master.impl.CrawlerMasterServer;
+import banana.master.impl.MasterServer;
 
 public class TaskTracker {
 	
@@ -161,7 +161,7 @@ public class TaskTracker {
 				filter = new SimpleBloomFilter();
 				break;
 			case "mongo":
-				filter = new MongoDBFilter(filtercfg.key_name, CrawlerMasterServer.getInstance().getMongoDB().getCollection(config.collection));
+				filter = new MongoDBFilter(filtercfg.key_name, MasterServer.getInstance().getMongoDB().getCollection(config.collection));
 				break;
 			}
 		}
@@ -184,7 +184,7 @@ public class TaskTracker {
 	
 
 	private void initPreviousLinks(boolean synchronizeLinks,String name,String collection) throws Exception {
-		GridFS tracker_status = new GridFS(CrawlerMasterServer.getInstance().getMongoDB(),"tracker_stat");
+		GridFS tracker_status = new GridFS(MasterServer.getInstance().getMongoDB(),"tracker_stat");
 		GridFSDBFile file = tracker_status.findOne(name + "_" + collection + "_filter");
 		if (file != null){
 			byte[] filterData = SystemUtil.inputStreamToBytes(file.getInputStream());
@@ -251,7 +251,7 @@ public class TaskTracker {
 	}
 
 	public void start() throws Exception {
-		downloads = CrawlerMasterServer.getInstance().elect(taskId, config.thread);
+		downloads = MasterServer.getInstance().elect(taskId, config.thread);
 		logger.info(String.format("%s 分配了%d个Downloader", taskId, downloads.size()));
 		for (RemoteDownloaderTracker rdt : downloads) {
 			logger.info(String.format("%s Downloader %s Thread %d", taskId, rdt.getIp(), rdt.getWorkThread()));
@@ -319,8 +319,7 @@ public class TaskTracker {
 				}
 			}
 		} else {
-			List<RemoteDownloaderTracker> newTrackers = CrawlerMasterServer.getInstance().electAgain(downloads,
-					diffNum);
+			List<RemoteDownloaderTracker> newTrackers = MasterServer.getInstance().electAgain(downloads,diffNum);
 			if (newTrackers != null) {
 				downloads.addAll(newTrackers);
 				for (RemoteDownloaderTracker remoteDownloader : newTrackers) {
@@ -444,7 +443,6 @@ public class TaskTracker {
 						e.printStackTrace();
 					}
 				}
-				CrawlerMasterServer.getInstance().removeTask(taskId);
 				logger.info(config.name + " 完成销毁");
 				downloads = null;
 			};

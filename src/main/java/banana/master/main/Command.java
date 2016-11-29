@@ -19,11 +19,11 @@ import org.apache.hadoop.ipc.RPC.Server;
 import com.alibaba.fastjson.JSON;
 
 import banana.core.modle.MasterConfig;
-import banana.core.protocol.CrawlerMasterProtocol;
+import banana.core.protocol.MasterProtocol;
 import banana.core.protocol.Task;
-import banana.master.impl.CrawlerMasterServer;
+import banana.master.impl.MasterServer;
 
-public class StartMaster {
+public class Command {
 
 	public static void main(String[] args) throws Exception {
 		args = (args == null || args.length == 0) ? new String[] {} : args;
@@ -33,6 +33,7 @@ public class StartMaster {
 		options.addOption("c", "config", true, "config file");
 		options.addOption("s", "submit", true, "submit task from a jsonfile");
 		options.addOption("st", "stoptask", true, "stop a task");
+		options.addOption("sc", "stopcluster", false, "stop all task and cluster");
 		CommandLine commandLine = parser.parse(options, args);
 		HelpFormatter formatter = new HelpFormatter();
 		if (commandLine.hasOption('h')) {
@@ -41,13 +42,21 @@ public class StartMaster {
 		}
 		if (commandLine.hasOption("st")){
 			String taskname = commandLine.getOptionValue("st");
-			CrawlerMasterProtocol proxy = (CrawlerMasterProtocol) RPC.getProxy(CrawlerMasterProtocol.class,CrawlerMasterProtocol.versionID,new InetSocketAddress("localhost",8666),new Configuration());
+			MasterProtocol proxy = (MasterProtocol) RPC.getProxy(MasterProtocol.class,MasterProtocol.versionID,new InetSocketAddress("localhost",8666),new Configuration());
 			if (proxy.existTask(taskname).get()){
 				proxy.stopTask(taskname);
 				System.out.println(taskname + " stoped");
 			}else{
-				System.out.println(taskname + "not exist");
+				System.out.println(taskname + " not existd");
 			}
+			return;
+		}
+		if (commandLine.hasOption("sc")){
+			MasterProtocol proxy = (MasterProtocol) RPC.getProxy(MasterProtocol.class,MasterProtocol.versionID,new InetSocketAddress("localhost",8666),new Configuration());
+			try{
+				proxy.stopCluster();
+			}catch(Exception e){}
+			System.out.println("cluster stoped");
 			return;
 		}
 		//submit是提交任务
@@ -57,7 +66,7 @@ public class StartMaster {
 			task.verify();
 			boolean resubmit = false;
 			Scanner scan = new Scanner(System.in);
-			CrawlerMasterProtocol proxy = (CrawlerMasterProtocol) RPC.getProxy(CrawlerMasterProtocol.class,CrawlerMasterProtocol.versionID,new InetSocketAddress("localhost",8666),new Configuration());
+			MasterProtocol proxy = (MasterProtocol) RPC.getProxy(MasterProtocol.class,MasterProtocol.versionID,new InetSocketAddress("localhost",8666),new Configuration());
 			if (proxy.existTask(task.name).get()){
 				System.out.print("Name for the task of "+ task.name +" already exists, do you want to update the configuration?\nConfirm the input y/yes:");
 				String yes = scan.next();
@@ -105,18 +114,15 @@ public class StartMaster {
 			configFile = new File(commandLine.getOptionValue("c"));
 		}else if (!configFile.exists()){
 			try{
-				configFile = new File(StartMaster.class.getClassLoader().getResource("").getPath() + "/master_config.json");
+				configFile = new File(Command.class.getClassLoader().getResource("").getPath() + "/master_config.json");
 			}catch(Exception e){
 				System.out.println("请指定配置文件位置");
 				System.exit(0);
 			}
 		}
 		MasterConfig config = JSON.parseObject(FileUtils.readFileToString(configFile),MasterConfig.class);
-		CrawlerMasterServer crawlerMasterServer = new CrawlerMasterServer(config);
-		Server server = new RPC.Builder(new Configuration()).setProtocol(CrawlerMasterProtocol.class)
-				.setInstance(crawlerMasterServer).setBindAddress("0.0.0.0").setPort(config.listen).setNumHandlers(config.handlers)
-				.build();
-		server.start();
+		MasterServer masterServer = new MasterServer(config);
+		masterServer.start();
 		System.out.println("Master已经启动!!!可以陆续启动Downloader来扩展集群了");
 	}
 

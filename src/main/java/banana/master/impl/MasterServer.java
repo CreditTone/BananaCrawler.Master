@@ -16,12 +16,14 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Timer;
 
+import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.ProtocolSignature;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.RPC.Server;
 import org.apache.log4j.Logger;
 
 import com.mongodb.BasicDBObject;
@@ -36,7 +38,7 @@ import com.mongodb.gridfs.GridFSDBFile;
 
 import banana.core.exception.CrawlerMasterException;
 import banana.core.modle.MasterConfig;
-import banana.core.protocol.CrawlerMasterProtocol;
+import banana.core.protocol.MasterProtocol;
 import banana.core.protocol.DownloadProtocol;
 import banana.core.protocol.Task;
 import banana.core.request.Cookies;
@@ -46,16 +48,18 @@ import banana.master.task.RemoteDownloaderTracker;
 import banana.master.task.TaskTimer;
 import banana.master.task.TaskTracker;
 
-public final class CrawlerMasterServer implements CrawlerMasterProtocol {
+public final class MasterServer implements MasterProtocol {
 	
 	/**
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
 
-	private static Logger logger = Logger.getLogger(CrawlerMasterServer.class);
+	private static Logger logger = Logger.getLogger(MasterServer.class);
 	
-	private static CrawlerMasterServer master = null;
+	private static MasterServer master = null;
+	
+	private Server rpcServer = null;
 	
 	private MasterConfig config;
 	
@@ -69,13 +73,13 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	
 	private Connection jdbcConnection;
 	
-	public CrawlerMasterServer(MasterConfig config){
+	public MasterServer(MasterConfig config){
 		super();
 		this.config = config;
 		master = this;
 	}
 	
-	public static final CrawlerMasterServer getInstance(){
+	public static final MasterServer getInstance(){
 		return master;
 	}
 	
@@ -120,8 +124,7 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		}
 		try {
 			DownloadProtocol dp = RPC.getProxy(DownloadProtocol.class, DownloadProtocol.versionID, new InetSocketAddress(remote,port),new Configuration());
-			RemoteDownload rm = new RemoteDownload(remote,port);
-			rm.setDownloadProtocol(dp);
+			RemoteDownload rm = new RemoteDownload(remote,port,dp);
 			downloads.add(rm);
 			logger.info("Downloader has been registered " + remote);
 		} catch (Exception e) {
@@ -161,7 +164,7 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	
 	@Override
 	public long getProtocolVersion(String protocol, long clientVersion) throws IOException {
-		return CrawlerMasterProtocol.versionID;
+		return MasterProtocol.versionID;
 	}
 
 	@Override
@@ -170,7 +173,7 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		return new ProtocolSignature(versionID, null);
 	}
 
-	public void submitTask(Task config) throws Exception {
+	public synchronized void submitTask(Task config) throws Exception {
 		if (downloads.isEmpty()){
 			throw new RuntimeException("There is no downloader");
 		}
@@ -305,10 +308,6 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 		return new BooleanWritable(false);
 	}
 	
-	public void removeTask(String taskId){
-		tasks.remove(taskId);
-	}
-	
 	@Override
 	public IntWritable removeBeforeResult(String collection, String taskName) throws Exception {
 		WriteResult result = getMongoDB().getCollection(collection).remove(new BasicDBObject("_task_name", taskName));
@@ -343,10 +342,11 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	}
 
 	@Override
-	public void stopTask(String taskname) throws Exception {
+	public synchronized void stopTask(String taskname) throws Exception {
 		for (TaskTracker tracker : tasks.values()) {
 			if (taskname.equals(tracker.getTaskName())){
 				tracker.destoryTask();
+				tasks.remove(tracker.getTaskName());
 				break;
 			}
 		}
@@ -363,6 +363,26 @@ public final class CrawlerMasterServer implements CrawlerMasterProtocol {
 	@Override
 	public MasterConfig getMasterConfig() throws CrawlerMasterException {
 		return config;
+	}
+
+	@Override
+	public synchronized void stopCluster() throws Exception {
+		for (TaskTracker tracker : tasks.values()) {
+			stopTask(tracker.getTaskName());
+		}
+		for (RemoteDownload remote : downloads){
+			remote.stopDownloader();
+		}
+		rpcServer.stop();
+		rpcServer = null;
+		downloads = null;
+	}
+	
+	public void start() throws HadoopIllegalArgumentException, IOException{
+		rpcServer = new RPC.Builder(new Configuration()).setProtocol(MasterProtocol.class)
+				.setInstance(this).setBindAddress("0.0.0.0").setPort(config.listen).setNumHandlers(config.handlers)
+				.build();
+		rpcServer.start();
 	}
 	
 }

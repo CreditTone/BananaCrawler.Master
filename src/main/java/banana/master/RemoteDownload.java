@@ -1,15 +1,19 @@
 package banana.master;
 
+import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import org.apache.hadoop.ipc.ProtocolSignature;
 import org.apache.log4j.Logger;
 
 
 import banana.core.NodeStatus;
+import banana.core.exception.DownloadException;
 import banana.core.protocol.DownloadProtocol;
+import banana.core.protocol.Task;
 
-public class RemoteDownload extends TimerTask{
+public class RemoteDownload extends TimerTask {
 	
 	private static Logger logger = Logger.getLogger(RemoteDownload.class);
 	
@@ -25,9 +29,10 @@ public class RemoteDownload extends TimerTask{
 	
 	private long heartCheckPeriod = 1000 * 10;
 	
-	public RemoteDownload(String ip,int port) {
+	public RemoteDownload(String ip,int port,DownloadProtocol downloadProtocol) {
 		this.ip = ip;
 		this.port = port;
+		this.downloadProtocol = downloadProtocol;
 		timer.schedule(this, heartCheckPeriod, heartCheckPeriod);
 	}
 	
@@ -62,12 +67,32 @@ public class RemoteDownload extends TimerTask{
 	}
 
 
-	public DownloadProtocol getDownloadProtocol() {
-		return downloadProtocol;
+	public boolean startDownloadTracker(String taskId, int thread, Task config) throws DownloadException {
+		return downloadProtocol.startDownloadTracker(taskId, thread, config);
 	}
 
-	public void setDownloadProtocol(DownloadProtocol downloadProtocol) {
-		this.downloadProtocol = downloadProtocol;
+	public void resubmitTaskConfig(String taskId, int thread, Task config) throws DownloadException {
+		downloadProtocol.resubmitTaskConfig(taskId, thread, config);
+	}
+
+	public boolean isWaitRequest(String taskId) throws DownloadException {
+		return downloadProtocol.isWaitRequest(taskId);
+	}
+
+	public void stopDownloadTracker(String taskId) throws DownloadException {
+		downloadProtocol.stopDownloadTracker(taskId);
+	}
+
+	public void stopDownloader(){
+		try{
+			downloadProtocol.stopDownloader();
+		}catch(Exception e){
+		}
+		
+	}
+
+	public NodeStatus healthCheck() throws DownloadException {
+		return downloadProtocol.healthCheck();
 	}
 	
 }

@@ -20,7 +20,7 @@ import com.mongodb.DBObject;
 import banana.core.ExpandHandlebars;
 import banana.core.request.HttpRequest;
 import banana.core.request.RequestBuilder;
-import banana.master.impl.CrawlerMasterServer;
+import banana.master.impl.MasterServer;
 
 public class SeedQuerys {
 	
@@ -74,7 +74,7 @@ public class SeedQuerys {
 		Statement statement = null;
 		ResultSet result = null;
 		try{
-			statement = CrawlerMasterServer.getInstance().getSqlConnection().createStatement();
+			statement = MasterServer.getInstance().getSqlConnection().createStatement();
 			result = statement.executeQuery(sql);
 			ResultSetMetaData metaData = result.getMetaData();
 			ExpandHandlebars handlebar = new ExpandHandlebars();
@@ -111,7 +111,7 @@ public class SeedQuerys {
 	private List<HttpRequest> mongoDBFind() throws Exception{
 		Thread.sleep(3 * 1000);
 		List<HttpRequest> result = new ArrayList<HttpRequest>();
-		DBCursor cursor = CrawlerMasterServer.getInstance().getMongoDB().getCollection(collection).find(ref, keys).limit(limit);
+		DBCursor cursor = MasterServer.getInstance().getMongoDB().getCollection(collection).find(ref, keys).limit(limit);
 		if (cursor.count() == 0){
 			canQuery = false;
 			return result;

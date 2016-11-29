@@ -5,7 +5,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Timer;
 
-import banana.master.impl.CrawlerMasterServer;
+import banana.master.impl.MasterServer;
 
 
 public class TaskTimer extends java.util.TimerTask{
@@ -54,7 +54,7 @@ public class TaskTimer extends java.util.TimerTask{
 	public void run() {
 		try {
 			TaskTracker tracker = new TaskTracker(cfg);
-			CrawlerMasterServer.getInstance().tasks.put(tracker.getId(), tracker);
+			MasterServer.getInstance().tasks.put(tracker.getId(), tracker);
 			tracker.start();
 		} catch (Exception e) {
 			e.printStackTrace();

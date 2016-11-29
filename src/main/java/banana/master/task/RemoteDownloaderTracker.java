@@ -51,20 +51,20 @@ public class RemoteDownloaderTracker {
 
 	public void start() throws DownloadException{
 		String taskId = taskTracker.getId();
-		owner.getDownloadProtocol().startDownloadTracker(taskId, threadNum, taskTracker.getConfig());
+		owner.startDownloadTracker(taskId, threadNum, taskTracker.getConfig());
 		isValid = true;
 	}
 	
 	public void stop() throws DownloadException{
 		String taskId = taskTracker.getId();
-		owner.getDownloadProtocol().stopDownloadTracker(taskId);
+		owner.stopDownloadTracker(taskId);
 		isValid = false;
 	}
 	
 	public boolean isWaitRequest(){
 		String taskId = taskTracker.getId();
 		try {
-			return owner.getDownloadProtocol().isWaitRequest(taskId);
+			return owner.isWaitRequest(taskId);
 		} catch (DownloadException e) {
 			e.printStackTrace();
 		}
@@ -73,7 +73,7 @@ public class RemoteDownloaderTracker {
 	
 	public void updateConfig(int thread){
 		try {
-			owner.getDownloadProtocol().resubmitTaskConfig(taskTracker.getId(), thread, taskTracker.getConfig());
+			owner.resubmitTaskConfig(taskTracker.getId(), thread, taskTracker.getConfig());
 		} catch (DownloadException e) {
 			e.printStackTrace();
 		}
