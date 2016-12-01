@@ -1,7 +1,8 @@
 package banana.master.task;
 
 import banana.core.exception.DownloadException;
-import banana.core.protocol.Task;
+import banana.core.modle.TaskStatus;
+import banana.core.modle.TaskStatus.DownloaderTrackerStatus;
 import banana.master.RemoteDownload;
 
 public class RemoteDownloaderTracker {
@@ -77,6 +78,14 @@ public class RemoteDownloaderTracker {
 		} catch (DownloadException e) {
 			e.printStackTrace();
 		}
+	}
+	
+	public DownloaderTrackerStatus getStatus(){
+		DownloaderTrackerStatus status = new DownloaderTrackerStatus();
+		status.thread = threadNum;
+		status.owner = owner.getIp() + ":" + owner.getPort();
+		status.stat = TaskStatus.Stat.Runing;
+		return status;
 	}
 	
 }

@@ -13,7 +13,7 @@ import banana.core.protocol.Task;
 import banana.core.queue.BlockingRequestQueue;
 import banana.core.queue.DelayedPriorityBlockingQueue;
 import banana.core.request.StartContext;
-import banana.master.impl.MasterServer;
+import banana.master.MasterServer;
 
 public class BackupRunnable extends TimerTask implements Closeable {
 	
@@ -72,10 +72,12 @@ public class BackupRunnable extends TimerTask implements Closeable {
 		if (filter != null){
 			String filename = config.name + "_" + config.collection + "_filter";
 			byte[] filterData = filter.toBytes();
-			tracker_status.remove(filename);
-			GridFSInputFile file = tracker_status.createFile(filterData);
-			file.setFilename(filename);
-			file.save();
+			if (filterData != null){
+				tracker_status.remove(filename);
+				GridFSInputFile file = tracker_status.createFile(filterData);
+				file.setFilename(filename);
+				file.save();
+			}
 		}
 		String filename = config.name + "_" + config.collection + "_context";
 		tracker_status.remove(filename);

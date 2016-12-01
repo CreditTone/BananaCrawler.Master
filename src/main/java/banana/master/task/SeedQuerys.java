@@ -20,7 +20,7 @@ import com.mongodb.DBObject;
 import banana.core.ExpandHandlebars;
 import banana.core.request.HttpRequest;
 import banana.core.request.RequestBuilder;
-import banana.master.impl.MasterServer;
+import banana.master.MasterServer;
 
 public class SeedQuerys {
 	

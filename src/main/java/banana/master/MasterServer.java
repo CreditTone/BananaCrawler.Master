@@ -1,4 +1,4 @@
-package banana.master.impl;
+package banana.master;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -28,6 +28,7 @@ import org.apache.log4j.Logger;
 
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
+import com.mongodb.DBCursor;
 import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoCredential;
@@ -37,13 +38,15 @@ import com.mongodb.gridfs.GridFS;
 import com.mongodb.gridfs.GridFSDBFile;
 
 import banana.core.exception.CrawlerMasterException;
+import banana.core.modle.CommandResponse;
 import banana.core.modle.MasterConfig;
+import banana.core.modle.TaskStatus;
+import banana.core.modle.TaskStatus.DownloaderTrackerStatus;
 import banana.core.protocol.MasterProtocol;
 import banana.core.protocol.DownloadProtocol;
 import banana.core.protocol.Task;
 import banana.core.request.Cookies;
 import banana.core.request.HttpRequest;
-import banana.master.RemoteDownload;
 import banana.master.task.RemoteDownloaderTracker;
 import banana.master.task.TaskTimer;
 import banana.master.task.TaskTracker;
@@ -104,9 +107,15 @@ public final class MasterServer implements MasterProtocol {
 	
 	public Connection getSqlConnection() throws SQLException{
 		if (config.jdbc != null && (jdbcConnection == null || jdbcConnection.isClosed())){
+			String className = null;
+			if (config.jdbc.startsWith("jdbc:mysql://")){
+				className = "com.mysql.jdbc.Driver";
+			}else if (config.jdbc.contains("jdbc:sqlserver://")){
+				className = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
+			}
 			try{   
 			    //加载MySql的驱动类   
-			    Class.forName("com.mysql.jdbc.Driver") ;   
+			    Class.forName(className) ;   
 			}catch(ClassNotFoundException e){   
 			   	System.out.println("找不到驱动程序类 ，加载驱动失败！");   
 			    e.printStackTrace();
@@ -116,10 +125,10 @@ public final class MasterServer implements MasterProtocol {
 		return jdbcConnection;
 	}
 	
-	public void registerDownloadNode(String remote,int port) throws CrawlerMasterException {
+	public CommandResponse registerDownloadNode(String remote,int port) {
 		for (RemoteDownload download : downloads) {
 			if(download.getIp().equals(remote) && port == download.getPort()){
-				return;
+				return new CommandResponse(false,"download "+remote+":"+port+" registed");
 			}
 		}
 		try {
@@ -129,7 +138,9 @@ public final class MasterServer implements MasterProtocol {
 			logger.info("Downloader has been registered " + remote);
 		} catch (Exception e) {
 			logger.warn("Downloader the registration failed", e);
+			return new CommandResponse(false,"Downloader the registration failed");
 		}
+		return new CommandResponse(true);
 	}
 	
 	public List<RemoteDownload> getDownloads(){
@@ -145,11 +156,12 @@ public final class MasterServer implements MasterProtocol {
 		return null;
 	}
 
-	public void pushTaskRequest(String taskId, HttpRequest request) {
+	public CommandResponse pushTaskRequest(String taskId, HttpRequest request) {
 		TaskTracker task = tasks.get(taskId);
 		if (task != null){
 			task.pushRequest(request);
 		}
+		return new CommandResponse(true);
 	}
 	
 	public HttpRequest pollTaskRequest(String taskId) {
@@ -173,12 +185,14 @@ public final class MasterServer implements MasterProtocol {
 		return new ProtocolSignature(versionID, null);
 	}
 
-	public synchronized void submitTask(Task config) throws Exception {
+	public synchronized CommandResponse submitTask(Task config) throws Exception {
 		if (downloads.isEmpty()){
-			throw new RuntimeException("There is no downloader");
+			return new CommandResponse(false, "There is no downloader");
 		}
-		if (isResubmit(config)){
-			return;
+		TaskTracker taskTracker = getTaskTrackerByName(config.name);
+		if (taskTracker != null){
+			taskTracker.updateConfig(config);
+			return new CommandResponse(true);
 		}
 		if (config.timer != null){
 			TaskTimer taskTimer = new TaskTimer(config);
@@ -197,16 +211,16 @@ public final class MasterServer implements MasterProtocol {
 			tasks.put(tracker.getId(), tracker);
 			tracker.start();
 		}
+		return new CommandResponse(true);
 	}
 	
-	private boolean isResubmit(Task config) throws Exception {
+	private TaskTracker getTaskTrackerByName(String name) throws Exception {
 		for (TaskTracker tracker : tasks.values()) {
-			if (config.name.equals(tracker.getTaskName())){
-				tracker.updateConfig(config);
-				return true;
+			if (name.equals(tracker.getTaskName())){
+				return tracker;
 			}
 		}
-		return false;
+		return null;
 	}
 	
 
@@ -297,37 +311,11 @@ public final class MasterServer implements MasterProtocol {
 		}
 		return newRemoteDownload != null?new ArrayList<RemoteDownloaderTracker>(newRemoteDownload.values()):null;
 	}
-
-	@Override
-	public BooleanWritable existTask(String taskName) {
-		for (TaskTracker tracker : tasks.values()) {
-			if (taskName.equals(tracker.getTaskName())){
-				return new BooleanWritable(true);
-			}
-		}
-		return new BooleanWritable(false);
-	}
 	
 	@Override
 	public IntWritable removeBeforeResult(String collection, String taskName) throws Exception {
 		WriteResult result = getMongoDB().getCollection(collection).remove(new BasicDBObject("_task_name", taskName));
 		return new IntWritable(result.getN());
-	}
-
-	@Override
-	public BooleanWritable taskdataExists(String collection,String taskName) {
-		if (getMongoDB().collectionExists(collection)){
-			DBObject obj = getMongoDB().getCollection(collection).findOne(new BasicDBObject("_task_name", taskName));
-			return new BooleanWritable(obj != null);
-		}
-		return new BooleanWritable(false);
-	}
-
-	@Override
-	public BooleanWritable statExists(String collection, String taskname) {
-		GridFS tracker_status = new GridFS(getMongoDB(),"tracker_stat");
-		GridFSDBFile file = tracker_status.findOne(taskname + "_" + collection + "_filter");
-		return new BooleanWritable(file != null);
 	}
 
 	@Override
@@ -342,22 +330,24 @@ public final class MasterServer implements MasterProtocol {
 	}
 
 	@Override
-	public synchronized void stopTask(String taskname) throws Exception {
+	public synchronized  CommandResponse stopTask(String taskname){
 		for (TaskTracker tracker : tasks.values()) {
 			if (taskname.equals(tracker.getTaskName())){
 				tracker.destoryTask();
 				tasks.remove(tracker.getTaskName());
-				break;
+				return new CommandResponse(true);
 			}
 		}
+		return new CommandResponse(false,"not found task");
 	}
 
 	@Override
-	public void injectCookies(Cookies cookies, String taskId) throws Exception {
+	public CommandResponse injectCookies(Cookies cookies, String taskId) throws Exception {
 		TaskTracker task = tasks.get(taskId);
 		if (task != null){
 			
 		}
+		return null;
 	}
 
 	@Override
@@ -366,7 +356,7 @@ public final class MasterServer implements MasterProtocol {
 	}
 
 	@Override
-	public synchronized void stopCluster() throws Exception {
+	public synchronized CommandResponse stopCluster() throws Exception {
 		for (TaskTracker tracker : tasks.values()) {
 			stopTask(tracker.getTaskName());
 		}
@@ -376,6 +366,7 @@ public final class MasterServer implements MasterProtocol {
 		rpcServer.stop();
 		rpcServer = null;
 		downloads = null;
+		return new CommandResponse(true);
 	}
 	
 	public void start() throws HadoopIllegalArgumentException, IOException{
@@ -383,6 +374,52 @@ public final class MasterServer implements MasterProtocol {
 				.setInstance(this).setBindAddress("0.0.0.0").setPort(config.listen).setNumHandlers(config.handlers)
 				.build();
 		rpcServer.start();
+	}
+
+	@Override
+	public TaskStatus taskStatus(Task taskconfig) {
+		TaskStatus status = new TaskStatus();
+		status.name = taskconfig.name;
+		for (TaskTracker tracker : tasks.values()) {
+			if (status.name.equals(tracker.getTaskName())){
+				status.stat = TaskStatus.Stat.Runing;
+				status.id = tracker.getId();
+				status.downloaderTrackerStatus = new ArrayList<DownloaderTrackerStatus>();
+				for (RemoteDownloaderTracker remoteTracker : tracker.getDownloads()) {
+					status.downloaderTrackerStatus.add(remoteTracker.getStatus());
+				}
+				break;
+			}
+		}
+		if (status.id == null){
+			for (TaskTimer taskTimer : timers) {
+				if (status.name.equals(taskTimer.cfg.name)){
+					status.stat = TaskStatus.Stat.Timing;
+					status.id = "";
+					status.downloaderTrackerStatus = new ArrayList<DownloaderTrackerStatus>();
+					break;
+				}
+			}
+		}
+		if (status.id == null){
+			status.id = "";
+			status.stat = TaskStatus.Stat.NoTask;
+			status.downloaderTrackerStatus = new ArrayList<DownloaderTrackerStatus>();
+		}
+		if (getMongoDB().collectionExists(taskconfig.collection)){
+			DBCursor cursor = getMongoDB().getCollection(taskconfig.collection).find(new BasicDBObject("_task_name", taskconfig.name));
+			status.dataCount = cursor.count();
+			cursor.close();
+		}
+		GridFS tracker_status = new GridFS(getMongoDB(),"tracker_stat");
+		GridFSDBFile file = tracker_status.findOne(taskconfig.name + "_" + taskconfig.collection + "_links");
+		status.requestCount = (file!=null) && file.getLength() > 0 ? 1 : 0;
+		return status;
+	}
+
+	@Override
+	public BooleanWritable verifyPassword(String password) throws Exception {
+		return new BooleanWritable(password.equals(config.password));
 	}
 	
 }

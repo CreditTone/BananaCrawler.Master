@@ -31,7 +31,7 @@ import banana.core.request.PageRequest;
 import banana.core.request.RequestBuilder;
 import banana.core.request.StartContext;
 import banana.core.util.SystemUtil;
-import banana.master.impl.MasterServer;
+import banana.master.MasterServer;
 
 public class TaskTracker {
 	
@@ -60,6 +60,8 @@ public class TaskTracker {
 	private int loopCount = 0;
 	
 	private BackupRunnable backupRunnable;
+	
+	private boolean runing = true;
 	
 	public TaskTracker(Task taskConfig) throws Exception {
 		config = taskConfig;
@@ -153,15 +155,15 @@ public class TaskTracker {
 		}
 	}
 	
-	private void initFilter(Task.Filter filtercfg){
-		filter = new NotFilter();
-		if (filtercfg.type != null && filtercfg.type.length() > 0) {
-			switch (filtercfg.type) {
+	private void initFilter(String filter){
+		this.filter = new NotFilter();
+		if (filter.length() > 0) {
+			switch (filter) {
 			case "simple":
-				filter = new SimpleBloomFilter();
+				this.filter = new SimpleBloomFilter();
 				break;
 			case "mongo":
-				filter = new MongoDBFilter(filtercfg.key_name, MasterServer.getInstance().getMongoDB().getCollection(config.collection));
+				this.filter = new MongoDBFilter(MasterServer.getInstance().getMongoDB().getCollection(config.collection));
 				break;
 			}
 		}
@@ -188,21 +190,19 @@ public class TaskTracker {
 		GridFSDBFile file = tracker_status.findOne(name + "_" + collection + "_filter");
 		if (file != null){
 			byte[] filterData = SystemUtil.inputStreamToBytes(file.getInputStream());
-			System.out.println("filterData len = " + filterData.length);
 			filter.load(filterData);
 		}
 		file = tracker_status.findOne(name + "_" + collection + "_context");
 		if (file != null){
 			byte[] contextData = SystemUtil.inputStreamToBytes(file.getInputStream());
-			System.out.println("contextData len = " + contextData.length);
 			context.load(contextData);
 		}
 		if (synchronizeLinks){
 			file = tracker_status.findOne(name + "_" + collection + "_links");
 			if (file != null){
 				byte[] data = SystemUtil.inputStreamToBytes(file.getInputStream());
-				System.out.println("linksData len = " + data.length);
 				requestQueue.load(new ByteArrayInputStream(data));
+				logger.info(String.format("load last time requests %d", requestQueue.size()));
 			}
 		}
 	}
@@ -339,14 +339,6 @@ public class TaskTracker {
 	}
 
 	public void pushRequest(HttpRequest request) {
-		if (config.filter.target.contains(request.getProcessor())){
-			if (filter.contains(request.getUrl())){
-				logger.info(String.format("%s filter request %s", taskId, request.getUrl()));
-				return;
-			}else{
-				filter.add(request.getUrl());
-			}
-		}
 		logger.info(String.format("%s push request %s", taskId, request.getUrl()));
 		request.recodeRequest();
 		requestQueue.add(request);
@@ -413,15 +405,21 @@ public class TaskTracker {
 		}
 		return false;
 	}
+	
+	public List<RemoteDownloaderTracker> getDownloads() {
+		return downloads;
+	}
+	
 	/**
 	 * 任务完成销毁任务
 	 */
-	public final void destoryTask() {
+	public final synchronized void destoryTask() {
+		if (runing == false){
+			return;
+		}
+		runing = false;
 		new Thread(){
 			public void run() {
-				if (downloads == null){
-					return;
-				}
 				for (RemoteDownloaderTracker taskDownload : downloads) {
 					try {
 						taskDownload.stop();
@@ -443,8 +441,7 @@ public class TaskTracker {
 						e.printStackTrace();
 					}
 				}
-				logger.info(config.name + " 完成销毁");
-				downloads = null;
+				logger.info(config.name + " destory finished");
 			};
 		}.start();
 	}
