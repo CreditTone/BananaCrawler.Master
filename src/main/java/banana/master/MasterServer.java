@@ -334,7 +334,7 @@ public final class MasterServer implements MasterProtocol {
 		for (TaskTracker tracker : tasks.values()) {
 			if (taskname.equals(tracker.getTaskName())){
 				tracker.destoryTask();
-				tasks.remove(tracker.getTaskName());
+				tasks.remove(tracker.getId());
 				return new CommandResponse(true);
 			}
 		}
