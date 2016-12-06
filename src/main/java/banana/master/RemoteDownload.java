@@ -1,10 +1,8 @@
 package banana.master;
 
-import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import org.apache.hadoop.ipc.ProtocolSignature;
 import org.apache.log4j.Logger;
 
 

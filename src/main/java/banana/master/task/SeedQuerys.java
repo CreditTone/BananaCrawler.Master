@@ -19,6 +19,7 @@ import com.mongodb.DBObject;
 
 import banana.core.ExpandHandlebars;
 import banana.core.request.HttpRequest;
+import banana.core.request.HttpRequest.Method;
 import banana.core.request.RequestBuilder;
 import banana.master.MasterServer;
 
@@ -139,7 +140,9 @@ public class SeedQuerys {
 		for(Entry<String,Object> entry : context.entrySet()){
 			request.addAttribute(entry.getKey(), entry.getValue());
 		}
-		request.setMethod(request.getMethod());
+		if (seed_query.method != null && seed_query.method.equalsIgnoreCase("POST")){
+			request.setMethod(Method.POST);
+		}
 		if (seed_query.headers != null){
 			for (Entry<String,String> entry : seed_query.headers.entrySet()) {
 				String value = handlebar.escapeParse(entry.getValue(), context);
