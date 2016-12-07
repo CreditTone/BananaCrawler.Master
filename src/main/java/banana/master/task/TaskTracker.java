@@ -25,9 +25,7 @@ import banana.core.filter.SimpleBloomFilter;
 import banana.core.protocol.Task;
 import banana.core.queue.BlockingRequestQueue;
 import banana.core.queue.RequestQueueBuilder;
-import banana.core.request.BinaryRequest;
 import banana.core.request.HttpRequest;
-import banana.core.request.PageRequest;
 import banana.core.request.RequestBuilder;
 import banana.core.request.StartContext;
 import banana.core.util.SystemUtil;
@@ -56,8 +54,6 @@ public class TaskTracker {
 	private StartContext context;
 
 	private Filter filter = null;
-	
-	private int loopCount = 0;
 	
 	private BackupRunnable backupRunnable;
 	
@@ -353,21 +349,19 @@ public class TaskTracker {
 			Thread.sleep(100);
 		}
 		if (isAllWaiting() && requestQueue.isEmpty()) {
-			synchronized (this) {
-				System.out.println("synchronized tasktracker " + Thread.currentThread().getName());
-				if (requestQueue.isEmpty()){
-					if (seedQuerys != null && seedQuerys.canQuery()){
+			if (seedQuerys != null && seedQuerys.canQuery()){
+				synchronized (this) {
+					if (requestQueue.isEmpty()){
 						initSeedToRequestQueue();
 						return requestQueue.poll();
 					}
-					loopCount ++;
-					if (loopCount >= config.loops){
-						destoryTask();
-					}else{
-						logger.info(String.format("finish loop The %d times", loopCount));
-						initSeedToRequestQueue();
-					}
 				}
+			}else{
+				new Thread(){
+					public void run() {
+						MasterServer.getInstance().stopTask(getTaskName());
+					};
+				}.start();
 			}
 		}
 		return requestQueue.poll();
@@ -411,38 +405,34 @@ public class TaskTracker {
 	}
 	
 	/**
-	 * 任务完成销毁任务
+	 * 任务销毁
 	 */
-	public final synchronized void destoryTask() {
+	public final void destoryTask() {
 		if (runing == false){
 			return;
 		}
 		runing = false;
-		new Thread(){
-			public void run() {
-				for (RemoteDownloaderTracker taskDownload : downloads) {
-					try {
-						taskDownload.stop();
-					} catch (DownloadException e) {
-						e.printStackTrace();
-					}
-				}
-				logger.info("downloaderTracker closed");
-				if (backupRunnable != null){
-					logger.info("begin backup stats");
-					backupRunnable.close();
-					logger.info("backup stats finished");
-				}
-				if (requestQueue instanceof Closeable) {
-					Closeable closeable = (Closeable) requestQueue;
-					try {
-						closeable.close();
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-				}
-				logger.info(config.name + " destory finished");
-			};
-		}.start();
+		for (RemoteDownloaderTracker taskDownload : downloads) {
+			try {
+				taskDownload.stop();
+			} catch (DownloadException e) {
+				e.printStackTrace();
+			}
+		}
+		logger.info("downloaderTracker closed");
+		if (backupRunnable != null){
+			logger.info("begin backup stats");
+			backupRunnable.close();
+			logger.info("backup stats finished");
+		}
+		if (requestQueue instanceof Closeable) {
+			Closeable closeable = (Closeable) requestQueue;
+			try {
+				closeable.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		logger.info(config.name + " destory finished");
 	}
 }
