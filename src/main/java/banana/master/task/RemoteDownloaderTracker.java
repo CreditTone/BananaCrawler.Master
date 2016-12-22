@@ -1,8 +1,10 @@
 package banana.master.task;
 
 import banana.core.exception.DownloadException;
+import banana.core.modle.CommandResponse;
 import banana.core.modle.TaskStatus;
 import banana.core.modle.TaskStatus.DownloaderTrackerStatus;
+import banana.core.request.Cookies;
 import banana.master.RemoteDownload;
 
 public class RemoteDownloaderTracker {
@@ -88,4 +90,7 @@ public class RemoteDownloaderTracker {
 		return status;
 	}
 	
+	public void injectCookies(Cookies cookies) throws DownloadException{
+		owner.injectCookies(taskTracker.getId(), cookies);
+	}
 }

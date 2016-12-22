@@ -10,6 +10,7 @@ import banana.core.NodeStatus;
 import banana.core.exception.DownloadException;
 import banana.core.protocol.DownloadProtocol;
 import banana.core.protocol.Task;
+import banana.core.request.Cookies;
 
 public class RemoteDownload extends TimerTask {
 	
@@ -93,4 +94,7 @@ public class RemoteDownload extends TimerTask {
 		return downloadProtocol.healthCheck();
 	}
 	
+	public void injectCookies(String taskId,Cookies cookies) throws DownloadException{
+		downloadProtocol.injectCookies(taskId, cookies);
+	}
 }

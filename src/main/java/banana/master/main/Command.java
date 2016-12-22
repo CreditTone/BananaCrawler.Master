@@ -1,7 +1,6 @@
 package banana.master.main;
 
 import java.io.File;
-import java.io.IOException;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -13,7 +12,6 @@ import org.apache.commons.io.FileUtils;
 import com.alibaba.fastjson.JSON;
 
 import banana.core.modle.MasterConfig;
-import banana.core.protocol.Task;
 import banana.master.MasterServer;
 
 public class Command {

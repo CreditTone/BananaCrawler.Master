@@ -13,5 +13,17 @@
 		"password":"crawler"
 	},
 	"jdbc":"jdbc:mysql://127.0.0.1:3306/dasdsa?user=asdsad&password=sadsadsa&useUnicode=true",
-	"password":"jisucloud"
+	"password":"jisucloud",
+	"email":{
+		"host":"smtp.qq.com",
+		"port":25,
+		"username":"1273568669@qq.com",
+		"password":"waontaldzwiegbcf",
+		"sender":"1273568669@qq.com",
+		"to":[
+			"guozhong@quicklyun.com",
+			"xuzuoyun@quicklyun.com",
+			"zouxiaobin@quicklyun.com"
+		]
+	}
 }
