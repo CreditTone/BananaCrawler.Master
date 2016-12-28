@@ -25,6 +25,7 @@ import banana.core.filter.SimpleBloomFilter;
 import banana.core.protocol.Task;
 import banana.core.queue.BlockingRequestQueue;
 import banana.core.queue.RequestQueueBuilder;
+import banana.core.request.Cookies;
 import banana.core.request.HttpRequest;
 import banana.core.request.RequestBuilder;
 import banana.core.request.StartContext;
@@ -59,7 +60,13 @@ public class TaskTracker {
 	
 	private boolean runing = true;
 	
+	private Cookies initCookies;
+	
 	public TaskTracker(Task taskConfig) throws Exception {
+		this(taskConfig, null);
+	}
+	
+	public TaskTracker(Task taskConfig,Cookies initCookies) throws Exception {
 		config = taskConfig;
 		taskId = taskConfig.name + "_" + new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
 		context = new StartContext();
@@ -69,11 +76,11 @@ public class TaskTracker {
 		setBackup();
 		initPreviousLinks(config.synchronizeLinks, config.name, config.collection);
 		initSeedToRequestQueue();
-		logger.info(String.format("TaskTracker %s use filter %s queue %s", taskId, filter.getClass().getName(), requestQueue.getClass().getName()));
-		Iterator<HttpRequest> iter = requestQueue.iterator();
-		while(iter.hasNext()) {
-			logger.info(String.format("seed %s", iter.next().getUrl()));
-		}
+		this.initCookies = initCookies;
+		logger.info(String.format("TaskTracker %s use filter %s", taskId, filter.getClass().getName()));
+		logger.info(String.format("TaskTracker %s use queue %s", taskId, requestQueue.getClass().getName()));
+		logger.info(String.format("TaskTracker %s use seeds %d", taskId, requestQueue.size()));
+		logger.info(String.format("TaskTracker %s use init cookies %s", taskId, initCookies != null));
 	}
 	
 	private void setBackup(){
@@ -257,7 +264,7 @@ public class TaskTracker {
 		}
 		for (RemoteDownloaderTracker taskDownload : downloads) {
 			taskDownload.setTaskTracker(this);
-			taskDownload.start();
+			taskDownload.start(initCookies);
 		}
 	}
 
@@ -407,7 +414,7 @@ public class TaskTracker {
 	/**
 	 * 任务销毁
 	 */
-	public final void destoryTask() {
+	public void destoryTask() {
 		if (runing == false){
 			return;
 		}

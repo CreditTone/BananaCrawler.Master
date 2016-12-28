@@ -66,8 +66,8 @@ public class RemoteDownload extends TimerTask {
 	}
 
 
-	public boolean startDownloadTracker(String taskId, int thread, Task config) throws DownloadException {
-		return downloadProtocol.startDownloadTracker(taskId, thread, config);
+	public boolean startDownloadTracker(String taskId,Task config,Cookies initCookie) throws DownloadException {
+		return downloadProtocol.startDownloadTracker(taskId, config, initCookie);
 	}
 
 	public void resubmitTaskConfig(String taskId, int thread, Task config) throws DownloadException {

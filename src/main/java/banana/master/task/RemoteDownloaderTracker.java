@@ -51,10 +51,14 @@ public class RemoteDownloaderTracker {
 	public boolean isStoped() {
 		return isValid;
 	}
+	
+	public void start()throws DownloadException{
+		start(null);
+	}
 
-	public void start() throws DownloadException{
+	public void start(Cookies initCookie) throws DownloadException{
 		String taskId = taskTracker.getId();
-		owner.startDownloadTracker(taskId, threadNum, taskTracker.getConfig());
+		owner.startDownloadTracker(taskId, taskTracker.getConfig(), initCookie);
 		isValid = true;
 	}
 	

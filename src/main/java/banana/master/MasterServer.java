@@ -7,6 +7,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -26,6 +27,7 @@ import org.mortbay.jetty.nio.SelectChannelConnector;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.parser.ParserConfig;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCursor;
@@ -41,12 +43,16 @@ import banana.core.modle.CommandResponse;
 import banana.core.modle.MasterConfig;
 import banana.core.modle.TaskStatus;
 import banana.core.modle.TaskStatus.DownloaderTrackerStatus;
+import banana.core.modle.TaskStatus.Stat;
 import banana.core.protocol.MasterProtocol;
+import banana.core.protocol.PreparedTask;
 import banana.core.protocol.DownloadProtocol;
 import banana.core.protocol.Task;
+import banana.core.protocol.Task.Seed;
 import banana.core.request.Cookie;
 import banana.core.request.Cookies;
 import banana.core.request.HttpRequest;
+import banana.core.util.DateCodec;
 import banana.master.task.RemoteDownloaderTracker;
 import banana.master.task.TaskTimer;
 import banana.master.task.TaskTracker;
@@ -73,15 +79,13 @@ public final class MasterServer implements MasterProtocol {
 
 	private MasterConfig config;
 
-	public Map<String, TaskTracker> tasks = new HashMap<String, TaskTracker>();
-
-	private List<TaskTimer> timers = new ArrayList<TaskTimer>();
-
 	private List<RemoteDownload> downloads = new ArrayList<RemoteDownload>();
 
 	private DB db;
 
 	private Connection jdbcConnection;
+	
+	private TaskManager taskManager = new TaskManager();
 
 	public MasterServer(MasterConfig config) {
 		super();
@@ -156,7 +160,7 @@ public final class MasterServer implements MasterProtocol {
 	}
 
 	public Object getTaskPropertie(String taskId, String propertieName) {
-		TaskTracker task = tasks.get(taskId);
+		TaskTracker task = taskManager.getTaskTrackerById(taskId);
 		if (task != null) {
 			return task.getProperties(propertieName);
 		}
@@ -164,7 +168,7 @@ public final class MasterServer implements MasterProtocol {
 	}
 
 	public CommandResponse pushTaskRequest(String taskId, HttpRequest request) {
-		TaskTracker task = tasks.get(taskId);
+		TaskTracker task = taskManager.getTaskTrackerById(taskId);
 		if (task != null) {
 			task.pushRequest(request);
 		}
@@ -172,7 +176,7 @@ public final class MasterServer implements MasterProtocol {
 	}
 
 	public HttpRequest pollTaskRequest(String taskId) {
-		TaskTracker task = tasks.get(taskId);
+		TaskTracker task = taskManager.getTaskTrackerById(taskId);
 		try {
 			return task.pollRequest();
 		} catch (Exception e) {
@@ -196,40 +200,29 @@ public final class MasterServer implements MasterProtocol {
 		if (downloads.isEmpty()) {
 			return new CommandResponse(false, "There is no downloader");
 		}
-		TaskTracker taskTracker = getTaskTrackerByName(config.name);
+		TaskTracker taskTracker = taskManager.getTaskTrackerByName(config.name);
 		if (taskTracker != null) {
 			taskTracker.updateConfig(config);
 			return new CommandResponse(true);
 		}
-		if (config.timer != null) {
-			TaskTimer taskTimer = new TaskTimer(config);
-			Iterator<TaskTimer> iter = timers.iterator();
-			while (iter.hasNext()) {
-				TaskTimer timer = iter.next();
-				if (timer.cfg.name.equals(config.name)) {
-					timers.remove(timer);
-					timer.stop();
-				}
+		if (config.mode != null && config.mode.timer != null) {
+			if (taskManager.existTimer(config.name)){
+				return new CommandResponse(false, "名字为"+config.name+"的定时器已经存在");
+			}else{
+				TaskTimer taskTimer = new TaskTimer(config);
+				taskManager.addTaskTimer(taskTimer);
+				taskTimer.start();
 			}
-			timers.add(taskTimer);
-			taskTimer.start();
-		} else {
+		}else if (config.mode != null && config.mode.prepared){
+			taskManager.addPreparedTask(config);
+		}else{
 			TaskTracker tracker = new TaskTracker(config);
-			tasks.put(tracker.getId(), tracker);
+			taskManager.addTaskTracker(tracker);
 			tracker.start();
 		}
 		return new CommandResponse(true);
 	}
-
-	private TaskTracker getTaskTrackerByName(String name) throws Exception {
-		for (TaskTracker tracker : tasks.values()) {
-			if (name.equals(tracker.getTaskName())) {
-				return tracker;
-			}
-		}
-		return null;
-	}
-
+	
 	/**
 	 * 选举Downloader LoadBalance
 	 * 
@@ -330,7 +323,7 @@ public final class MasterServer implements MasterProtocol {
 
 	@Override
 	public BooleanWritable filterQuery(String taskId, String... fields) {
-		TaskTracker task = tasks.get(taskId);
+		TaskTracker task = taskManager.getTaskTrackerById(taskId);
 		if (task != null) {
 			boolean result = task.filterQuery(fields);
 			task.addFilter(fields);
@@ -341,12 +334,11 @@ public final class MasterServer implements MasterProtocol {
 
 	@Override
 	public synchronized CommandResponse stopTask(String taskname) {
-		for (TaskTracker tracker : tasks.values()) {
-			if (taskname.equals(tracker.getTaskName())) {
-				tracker.destoryTask();
-				tasks.remove(tracker.getId());
-				return new CommandResponse(true);
-			}
+		TaskTracker tracker = taskManager.getTaskTrackerByName(taskname);
+		if (tracker != null) {
+			tracker.destoryTask();
+			taskManager.removeTaskTracker(taskname);
+			return new CommandResponse(true);
 		}
 		return new CommandResponse(false, "not found task");
 	}
@@ -370,12 +362,11 @@ public final class MasterServer implements MasterProtocol {
 				resp.getWriter().write("{\"success\":false}");
 			}
 		}
-
 	}
 
 	@Override
 	public CommandResponse injectCookies(Cookies cookies, String taskname) throws Exception {
-		TaskTracker task = getTaskTrackerByName(taskname);
+		TaskTracker task = taskManager.getTaskTrackerByName(taskname);
 		if (task != null) {
 			List<RemoteDownloaderTracker> downloaderTracker = task.getDownloads();
 			for (RemoteDownloaderTracker rdt : downloaderTracker) {
@@ -392,8 +383,11 @@ public final class MasterServer implements MasterProtocol {
 
 	@Override
 	public synchronized CommandResponse stopCluster() throws Exception {
-		for (TaskTracker tracker : tasks.values()) {
+		for (TaskTracker tracker : taskManager.allTaskTracker()) {
 			stopTask(tracker.getTaskName());
+		}
+		for (TaskTimer timer : taskManager.allTaskTimer()) {
+			timer.stop();
 		}
 		for (RemoteDownload remote : downloads) {
 			remote.stopDownloader();
@@ -412,55 +406,121 @@ public final class MasterServer implements MasterProtocol {
 		httpServer = new org.eclipse.jetty.server.Server(config.listen + 1000);
 		ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
 		context.addServlet(new ServletHolder(new InjectCookiesServlet()), "/injectCookies");
+		context.addServlet(new ServletHolder(new StartPreparedTaskServlet()), "/startPreparedTask");
 		httpServer.setHandler(context);
 		httpServer.start();
 	}
 
 	@Override
-	public TaskStatus taskStatus(Task taskconfig) {
+	public TaskStatus taskStatus(String taskname) {
 		TaskStatus status = new TaskStatus();
-		status.name = taskconfig.name;
-		for (TaskTracker tracker : tasks.values()) {
-			if (status.name.equals(tracker.getTaskName())) {
-				status.stat = TaskStatus.Stat.Runing;
-				status.id = tracker.getId();
-				status.downloaderTrackerStatus = new ArrayList<DownloaderTrackerStatus>();
+		status.name = taskname;
+		TaskTracker tracker = taskManager.getTaskTrackerByName(taskname);
+		if (tracker != null){
+			status.stat = TaskStatus.Stat.Runing;
+			status.id = tracker.getId();
+			status.downloaderTrackerStatus = new ArrayList<DownloaderTrackerStatus>();
+			for (RemoteDownloaderTracker remoteTracker : tracker.getDownloads()) {
+				status.downloaderTrackerStatus.add(remoteTracker.getStatus());
+			}
+			if (getMongoDB().collectionExists(taskname)) {
+				DBCursor cursor = getMongoDB().getCollection(tracker.getConfig().collection)
+						.find(new BasicDBObject("_task_name", taskname));
+				status.dataCount = cursor.count();
+				cursor.close();
+			}
+			GridFS tracker_status = new GridFS(getMongoDB(), "tracker_stat");
+			GridFSDBFile file = tracker_status.findOne(taskname + "_" + tracker.getConfig().collection + "_links");
+			status.requestCount = (file != null) && file.getLength() > 0 ? 1 : 0;
+		}else if (taskManager.existTimer(taskname)){
+			TaskTimer taskTimer = taskManager.getTaskTimerByName(taskname);
+			status.stat = taskTimer.stat;
+			status.id = "";
+			status.downloaderTrackerStatus = new ArrayList<DownloaderTrackerStatus>();
+			tracker = taskTimer.tracker;
+			if (status.stat == Stat.Runing){
 				for (RemoteDownloaderTracker remoteTracker : tracker.getDownloads()) {
 					status.downloaderTrackerStatus.add(remoteTracker.getStatus());
 				}
-				break;
-			}
-		}
-		if (status.id == null) {
-			for (TaskTimer taskTimer : timers) {
-				if (status.name.equals(taskTimer.cfg.name)) {
-					status.stat = TaskStatus.Stat.Timing;
-					status.id = "";
-					status.downloaderTrackerStatus = new ArrayList<DownloaderTrackerStatus>();
-					break;
+				if (getMongoDB().collectionExists(taskname)) {
+					DBCursor cursor = getMongoDB().getCollection(tracker.getConfig().collection)
+							.find(new BasicDBObject("_task_name", taskname));
+					status.dataCount = cursor.count();
+					cursor.close();
 				}
+				GridFS tracker_status = new GridFS(getMongoDB(), "tracker_stat");
+				GridFSDBFile file = tracker_status.findOne(taskname + "_" + tracker.getConfig().collection + "_links");
+				status.requestCount = (file != null) && file.getLength() > 0 ? 1 : 0;
 			}
-		}
-		if (status.id == null) {
+		}else if(taskManager.existPrepared(taskname)){
+			status.id = "";
+			status.stat = TaskStatus.Stat.Prepared;
+			status.downloaderTrackerStatus = new ArrayList<DownloaderTrackerStatus>();
+		}else{
 			status.id = "";
 			status.stat = TaskStatus.Stat.NoTask;
 			status.downloaderTrackerStatus = new ArrayList<DownloaderTrackerStatus>();
 		}
-		if (getMongoDB().collectionExists(taskconfig.collection)) {
-			DBCursor cursor = getMongoDB().getCollection(taskconfig.collection)
-					.find(new BasicDBObject("_task_name", taskconfig.name));
-			status.dataCount = cursor.count();
-			cursor.close();
-		}
-		GridFS tracker_status = new GridFS(getMongoDB(), "tracker_stat");
-		GridFSDBFile file = tracker_status.findOne(taskconfig.name + "_" + taskconfig.collection + "_links");
-		status.requestCount = (file != null) && file.getLength() > 0 ? 1 : 0;
 		return status;
 	}
 
 	@Override
 	public BooleanWritable verifyPassword(String password) throws Exception {
 		return new BooleanWritable(password.equals(config.password));
+	}
+	
+	public class StartPreparedTaskServlet extends HttpServlet {
+
+		@Override
+		protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+			String taskname = req.getParameter("taskname");
+			String seedsJson = req.getParameter("seeds");
+			String cookiesJson = req.getParameter("cookies");
+			try {
+				PreparedTask preparedTask = new PreparedTask();
+				preparedTask.name = taskname;
+				if (seedsJson != null){
+					JSONArray array = JSONArray.parseArray(seedsJson);
+					for (int i = 0; i < array.size(); i++) {
+						Seed seed = JSON.parseObject(array.getJSONObject(i).toString(), Seed.class);
+						preparedTask.seeds.add(seed);
+					}
+				}
+				if (cookiesJson != null){
+					ParserConfig.global.getDerializers().put(Date.class, new DateCodec());
+					JSONArray arr = JSON.parseArray(cookiesJson);
+					for (int i= 0 ; i < arr.size() ; i++){
+						Cookie cook = JSON.parseObject(arr.getJSONObject(i).toJSONString(), Cookie.class);
+						preparedTask.cookies.add(cook);
+					}
+				}
+				startPreparedTask(preparedTask);
+				resp.getWriter().write("{\"success\":true}");
+			} catch (Exception e) {
+				logger.warn("start prepared task ", e);
+				resp.getWriter().write("{\"success\":false}");
+			}
+		}
+	}
+
+	@Override
+	public CommandResponse startPreparedTask(PreparedTask config) throws Exception {
+		Task task = taskManager.getPreparedTaskByName(config.name);
+		if (task != null){
+			if (!config.seeds.isEmpty()){
+				task.seeds = config.seeds;
+			}
+			TaskTracker tracker;
+			if (!config.cookies.isEmpty()){
+				Cookies cookies = new Cookies(config.cookies);
+				tracker = new TaskTracker(task, cookies);
+			}else{
+				tracker = new TaskTracker(task);
+			}
+			taskManager.addTaskTracker(tracker);
+			tracker.start();
+		}
+		return new CommandResponse(true);
 	}
 
 }
