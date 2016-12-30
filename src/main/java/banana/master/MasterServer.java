@@ -494,8 +494,12 @@ public final class MasterServer implements MasterProtocol {
 						preparedTask.cookies.add(cook);
 					}
 				}
-				startPreparedTask(preparedTask);
-				resp.getWriter().write("{\"success\":true}");
+				CommandResponse response = startPreparedTask(preparedTask);
+				if (response.success){
+					resp.getWriter().write("{\"success\":true}");
+				}else{
+					resp.getWriter().write("{\"success\":false,\"msg\":\""+response.error+"\"}");
+				}
 			} catch (Exception e) {
 				logger.warn("start prepared task ", e);
 				resp.getWriter().write("{\"success\":false}");
@@ -519,6 +523,8 @@ public final class MasterServer implements MasterProtocol {
 			}
 			taskManager.addTaskTracker(tracker);
 			tracker.start();
+		}else{
+			return new CommandResponse(false, "prepared task not exists");
 		}
 		return new CommandResponse(true);
 	}
