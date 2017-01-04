@@ -41,6 +41,7 @@ import com.mongodb.gridfs.GridFSDBFile;
 import banana.core.exception.CrawlerMasterException;
 import banana.core.modle.CommandResponse;
 import banana.core.modle.MasterConfig;
+import banana.core.modle.TaskError;
 import banana.core.modle.TaskStatus;
 import banana.core.modle.TaskStatus.DownloaderTrackerStatus;
 import banana.core.modle.TaskStatus.Stat;
@@ -527,6 +528,14 @@ public final class MasterServer implements MasterProtocol {
 			return new CommandResponse(false, "prepared task not exists");
 		}
 		return new CommandResponse(true);
+	}
+
+	@Override
+	public void errorStash(String taskId, TaskError taskError) throws Exception {
+		TaskTracker taskTracker = taskManager.getTaskTrackerById(taskId);
+		if (taskTracker != null){
+			taskTracker.errorStash(taskError);
+		}
 	}
 
 }

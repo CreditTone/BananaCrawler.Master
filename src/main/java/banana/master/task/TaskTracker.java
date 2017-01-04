@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,8 @@ import java.util.Map;
 import org.apache.hadoop.io.Text;
 import org.apache.log4j.Logger;
 
+import com.mongodb.BasicDBObject;
+import com.mongodb.DBCollection;
 import com.mongodb.gridfs.GridFS;
 import com.mongodb.gridfs.GridFSDBFile;
 
@@ -22,6 +25,7 @@ import banana.core.filter.Filter;
 import banana.core.filter.MongoDBFilter;
 import banana.core.filter.NotFilter;
 import banana.core.filter.SimpleBloomFilter;
+import banana.core.modle.TaskError;
 import banana.core.protocol.Task;
 import banana.core.queue.BlockingRequestQueue;
 import banana.core.queue.RequestQueueBuilder;
@@ -61,6 +65,8 @@ public class TaskTracker {
 	private boolean runing = true;
 	
 	private Cookies initCookies;
+	
+	private HashSet<TaskError> errorStash = new HashSet<TaskError>();
 	
 	public TaskTracker(Task taskConfig) throws Exception {
 		this(taskConfig, null);
@@ -409,6 +415,22 @@ public class TaskTracker {
 	
 	public List<RemoteDownloaderTracker> getDownloads() {
 		return downloads;
+	}
+	
+	
+	public void errorStash(TaskError error){
+		if (!errorStash.contains(error)){
+			DBCollection collection = MasterServer.getInstance().getMongoDB().getCollection("task_error");
+			BasicDBObject dbObject = new BasicDBObject("error_type",error.errorType)
+					.append("time", error.time)
+					.append("exception_class", error.exceptionClass)
+					.append("exception_message", error.exceptionMessage)
+					.append("runtime_context", error.runtimeContext)
+					.append("taskname", error.taskname)
+					.append("taskid", error.taskid);
+			collection.insert(dbObject);
+			errorStash.add(error);
+		}
 	}
 	
 	/**
