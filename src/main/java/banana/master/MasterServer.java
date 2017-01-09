@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -23,7 +22,6 @@ import org.apache.hadoop.ipc.RPC.Server;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.mortbay.jetty.nio.SelectChannelConnector;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
@@ -216,6 +214,7 @@ public final class MasterServer implements MasterProtocol {
 			}
 		}else if (config.mode != null && config.mode.prepared){
 			taskManager.addPreparedTask(config);
+			logger.info("prepared task " + config.name);
 		}else{
 			TaskTracker tracker = new TaskTracker(config);
 			taskManager.addTaskTracker(tracker);

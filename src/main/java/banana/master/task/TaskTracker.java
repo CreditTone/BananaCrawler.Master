@@ -423,6 +423,8 @@ public class TaskTracker {
 			DBCollection collection = MasterServer.getInstance().getMongoDB().getCollection("task_error");
 			BasicDBObject dbObject = new BasicDBObject("error_type",error.errorType)
 					.append("time", error.time)
+					.append("method", error.method)
+					.append("first_native_line_number", error.firstNativeLineNumber)
 					.append("exception_class", error.exceptionClass)
 					.append("exception_message", error.exceptionMessage)
 					.append("runtime_context", error.runtimeContext)
