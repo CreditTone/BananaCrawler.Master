@@ -25,6 +25,8 @@ import banana.core.filter.Filter;
 import banana.core.filter.MongoDBFilter;
 import banana.core.filter.NotFilter;
 import banana.core.filter.SimpleBloomFilter;
+import banana.core.modle.TaskContext;
+import banana.core.modle.TaskContextImpl;
 import banana.core.modle.TaskError;
 import banana.core.protocol.Task;
 import banana.core.queue.BlockingRequestQueue;
@@ -32,7 +34,6 @@ import banana.core.queue.RequestQueueBuilder;
 import banana.core.request.Cookies;
 import banana.core.request.HttpRequest;
 import banana.core.request.RequestBuilder;
-import banana.core.request.StartContext;
 import banana.core.util.SystemUtil;
 import banana.master.MasterServer;
 
@@ -56,7 +57,7 @@ public class TaskTracker {
 	
 	private SeedQuerys seedQuerys;
 
-	private StartContext context;
+	private TaskContextImpl context;
 
 	private Filter filter = null;
 	
@@ -75,7 +76,7 @@ public class TaskTracker {
 	public TaskTracker(Task taskConfig,Cookies initCookies) throws Exception {
 		config = taskConfig;
 		taskId = taskConfig.name + "_" + new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
-		context = new StartContext();
+		context = new TaskContextImpl();
 		initContext(config.seeds, config.seed_query);
 		initFilter(config.filter);
 		initQueue(config.queue);
@@ -228,7 +229,7 @@ public class TaskTracker {
 		return config;
 	}
 
-	public StartContext getContext() {
+	public TaskContext getContext() {
 		return context;
 	}
 	

@@ -2,20 +2,24 @@ package banana.master;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.rmi.RemoteException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.ProtocolSignature;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RPC.Server;
@@ -37,6 +41,7 @@ import com.mongodb.gridfs.GridFS;
 import com.mongodb.gridfs.GridFSDBFile;
 
 import banana.core.exception.CrawlerMasterException;
+import banana.core.modle.BasicWritable;
 import banana.core.modle.CommandResponse;
 import banana.core.modle.MasterConfig;
 import banana.core.modle.TaskError;
@@ -470,12 +475,18 @@ public final class MasterServer implements MasterProtocol {
 	}
 	
 	public class StartPreparedTaskServlet extends HttpServlet {
+		
+		public static final String KEY_TASKNAME = "taskname";
+		
+		public static final String KEY_SEEDS = "seeds";
+		
+		public static final String KEY_COOKIES = "cookies";
 
 		@Override
 		protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-			String taskname = req.getParameter("taskname");
-			String seedsJson = req.getParameter("seeds");
-			String cookiesJson = req.getParameter("cookies");
+			String taskname = req.getParameter(KEY_TASKNAME);
+			String seedsJson = req.getParameter(KEY_SEEDS);
+			String cookiesJson = req.getParameter(KEY_COOKIES);
 			try {
 				PreparedTask preparedTask = new PreparedTask();
 				preparedTask.name = taskname;
@@ -493,6 +504,14 @@ public final class MasterServer implements MasterProtocol {
 						Cookie cook = JSON.parseObject(arr.getJSONObject(i).toJSONString(), Cookie.class);
 						preparedTask.cookies.add(cook);
 					}
+				}
+				Enumeration<String> parameterNames = req.getParameterNames();
+				while(parameterNames.hasMoreElements()){
+					String name  = parameterNames.nextElement();
+					if (name.equals(KEY_TASKNAME) || name.equals(KEY_SEEDS) || name.equals(KEY_COOKIES)){
+						continue;
+					}
+					preparedTask.taskContext.put(name, req.getParameter(name));
 				}
 				CommandResponse response = startPreparedTask(preparedTask);
 				if (response.success){
@@ -521,6 +540,11 @@ public final class MasterServer implements MasterProtocol {
 			}else{
 				tracker = new TaskTracker(task);
 			}
+			if (!config.taskContext.isEmpty()){
+				for (Entry<String,Object> entry:config.taskContext.entrySet()) {
+					tracker.getContext().putContextAttribute(entry.getKey(), entry.getValue());
+				}
+			}
 			taskManager.addTaskTracker(tracker);
 			tracker.start();
 		}else{
@@ -535,6 +559,35 @@ public final class MasterServer implements MasterProtocol {
 		if (taskTracker != null){
 			taskTracker.errorStash(taskError);
 		}
+	}
+
+	@Override
+	public BasicWritable getTaskContextAttribute(String taskid, String attribute) throws Exception {
+		TaskTracker taskTracker = taskManager.getTaskTrackerById(taskid);
+		if (taskTracker != null){
+			Object value = taskTracker.getContext().getContextAttribute(attribute);
+			if (value != null){
+				return new BasicWritable(value);
+			}
+		}
+		return null;
+	}
+
+	@Override
+	public void putTaskContextAttribute(String taskid, String attribute, BasicWritable value) throws Exception {
+		TaskTracker taskTracker = taskManager.getTaskTrackerById(taskid);
+		if (taskTracker != null){
+			taskTracker.getContext().putContextAttribute(attribute, value.getValue());
+		}
+	}
+
+	@Override
+	public BooleanWritable taskContextIsEmpty(String taskid) {
+		TaskTracker taskTracker = taskManager.getTaskTrackerById(taskid);
+		if (taskTracker != null){
+			return new BooleanWritable(taskTracker.getContext().isEmpty());
+		}
+		return new BooleanWritable(false);
 	}
 
 }
