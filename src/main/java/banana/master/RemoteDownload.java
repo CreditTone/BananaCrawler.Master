@@ -74,8 +74,8 @@ public class RemoteDownload extends TimerTask {
 		downloadProtocol.resubmitTaskConfig(taskId, thread, config);
 	}
 
-	public boolean isWaitRequest(String taskId) throws DownloadException {
-		return downloadProtocol.isWaitRequest(taskId);
+	public boolean isWorking(String taskId) throws DownloadException {
+		return downloadProtocol.isWorking(taskId);
 	}
 
 	public void stopDownloadTracker(String taskId) throws DownloadException {

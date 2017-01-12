@@ -8,6 +8,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -176,7 +177,7 @@ public final class MasterServer implements MasterProtocol {
 		if (task != null) {
 			task.pushRequest(request);
 		}
-		return new CommandResponse(true);
+		return new CommandResponse(true, task.getId());
 	}
 
 	public HttpRequest pollTaskRequest(String taskId) {
@@ -204,11 +205,6 @@ public final class MasterServer implements MasterProtocol {
 		if (downloads.isEmpty()) {
 			return new CommandResponse(false, "There is no downloader");
 		}
-		TaskTracker taskTracker = taskManager.getTaskTrackerByName(config.name);
-		if (taskTracker != null) {
-			taskTracker.updateConfig(config);
-			return new CommandResponse(true);
-		}
 		if (config.mode != null && config.mode.timer != null) {
 			if (taskManager.existTimer(config.name)){
 				return new CommandResponse(false, "名字为"+config.name+"的定时器已经存在");
@@ -221,9 +217,11 @@ public final class MasterServer implements MasterProtocol {
 			taskManager.addPreparedTask(config);
 			logger.info("prepared task " + config.name);
 		}else{
+			taskManager.verify(config);
 			TaskTracker tracker = new TaskTracker(config);
 			taskManager.addTaskTracker(tracker);
 			tracker.start();
+			return new CommandResponse(true, tracker.getId());
 		}
 		return new CommandResponse(true);
 	}
@@ -338,12 +336,12 @@ public final class MasterServer implements MasterProtocol {
 	}
 
 	@Override
-	public synchronized CommandResponse stopTask(String taskname) {
-		TaskTracker tracker = taskManager.getTaskTrackerByName(taskname);
+	public synchronized CommandResponse stopTaskById(String taskid) {
+		TaskTracker tracker = taskManager.getTaskTrackerById(taskid);
 		if (tracker != null) {
 			tracker.destoryTask();
-			taskManager.removeTaskTracker(taskname);
-			return new CommandResponse(true);
+			taskManager.removeTaskTrackerById(taskid);
+			return new CommandResponse(true, taskid);
 		}
 		return new CommandResponse(false, "not found task");
 	}
@@ -371,9 +369,9 @@ public final class MasterServer implements MasterProtocol {
 
 	@Override
 	public CommandResponse injectCookies(Cookies cookies, String taskname) throws Exception {
-		TaskTracker task = taskManager.getTaskTrackerByName(taskname);
-		if (task != null) {
-			List<RemoteDownloaderTracker> downloaderTracker = task.getDownloads();
+		Collection<TaskTracker> trackers = taskManager.getTaskTrackerByName(taskname);
+		for (TaskTracker tracker : trackers) {
+			List<RemoteDownloaderTracker> downloaderTracker = tracker.getDownloads();
 			for (RemoteDownloaderTracker rdt : downloaderTracker) {
 				rdt.injectCookies(cookies);
 			}
@@ -389,7 +387,7 @@ public final class MasterServer implements MasterProtocol {
 	@Override
 	public synchronized CommandResponse stopCluster() throws Exception {
 		for (TaskTracker tracker : taskManager.allTaskTracker()) {
-			stopTask(tracker.getTaskName());
+			stopTaskById(tracker.getTaskName());
 		}
 		for (TaskTimer timer : taskManager.allTaskTimer()) {
 			timer.stop();
@@ -401,7 +399,7 @@ public final class MasterServer implements MasterProtocol {
 		httpServer.stop();
 		rpcServer = null;
 		downloads = null;
-		return new CommandResponse(true);
+		return new CommandResponse(true,"");
 	}
 
 	public void start() throws Exception {
@@ -417,56 +415,29 @@ public final class MasterServer implements MasterProtocol {
 	}
 
 	@Override
-	public TaskStatus taskStatus(String taskname) {
-		TaskStatus status = new TaskStatus();
-		status.name = taskname;
-		TaskTracker tracker = taskManager.getTaskTrackerByName(taskname);
+	public TaskStatus getTaskStatusById(String taskid) {
+		TaskTracker tracker = taskManager.getTaskTrackerById(taskid);
 		if (tracker != null){
+			TaskStatus status = new TaskStatus();
+			status.name = tracker.getTaskName();
 			status.stat = TaskStatus.Stat.Runing;
 			status.id = tracker.getId();
 			status.downloaderTrackerStatus = new ArrayList<DownloaderTrackerStatus>();
 			for (RemoteDownloaderTracker remoteTracker : tracker.getDownloads()) {
 				status.downloaderTrackerStatus.add(remoteTracker.getStatus());
 			}
-			if (getMongoDB().collectionExists(taskname)) {
+			if (getMongoDB().collectionExists(status.name)) {
 				DBCursor cursor = getMongoDB().getCollection(tracker.getConfig().collection)
-						.find(new BasicDBObject("_task_name", taskname));
+						.find(new BasicDBObject("_task_name", status.name));
 				status.dataCount = cursor.count();
 				cursor.close();
 			}
 			GridFS tracker_status = new GridFS(getMongoDB(), "tracker_stat");
-			GridFSDBFile file = tracker_status.findOne(taskname + "_" + tracker.getConfig().collection + "_links");
+			GridFSDBFile file = tracker_status.findOne(status.name + "_" + tracker.getConfig().collection + "_links");
 			status.requestCount = (file != null) && file.getLength() > 0 ? 1 : 0;
-		}else if (taskManager.existTimer(taskname)){
-			TaskTimer taskTimer = taskManager.getTaskTimerByName(taskname);
-			status.stat = taskTimer.stat;
-			status.id = "";
-			status.downloaderTrackerStatus = new ArrayList<DownloaderTrackerStatus>();
-			tracker = taskTimer.tracker;
-			if (status.stat == Stat.Runing){
-				for (RemoteDownloaderTracker remoteTracker : tracker.getDownloads()) {
-					status.downloaderTrackerStatus.add(remoteTracker.getStatus());
-				}
-				if (getMongoDB().collectionExists(taskname)) {
-					DBCursor cursor = getMongoDB().getCollection(tracker.getConfig().collection)
-							.find(new BasicDBObject("_task_name", taskname));
-					status.dataCount = cursor.count();
-					cursor.close();
-				}
-				GridFS tracker_status = new GridFS(getMongoDB(), "tracker_stat");
-				GridFSDBFile file = tracker_status.findOne(taskname + "_" + tracker.getConfig().collection + "_links");
-				status.requestCount = (file != null) && file.getLength() > 0 ? 1 : 0;
-			}
-		}else if(taskManager.existPrepared(taskname)){
-			status.id = "";
-			status.stat = TaskStatus.Stat.Prepared;
-			status.downloaderTrackerStatus = new ArrayList<DownloaderTrackerStatus>();
-		}else{
-			status.id = "";
-			status.stat = TaskStatus.Stat.NoTask;
-			status.downloaderTrackerStatus = new ArrayList<DownloaderTrackerStatus>();
+			return status;
 		}
-		return status;
+		return null;
 	}
 
 	@Override
@@ -514,14 +485,10 @@ public final class MasterServer implements MasterProtocol {
 					preparedTask.taskContext.put(name, req.getParameter(name));
 				}
 				CommandResponse response = startPreparedTask(preparedTask);
-				if (response.success){
-					resp.getWriter().write("{\"success\":true}");
-				}else{
-					resp.getWriter().write("{\"success\":false,\"msg\":\""+response.error+"\"}");
-				}
+				resp.getWriter().write(JSON.toJSONString(response));
 			} catch (Exception e) {
 				logger.warn("start prepared task ", e);
-				resp.getWriter().write("{\"success\":false}");
+				resp.getWriter().write("{\"success\":false,\"msg\":\""+e.getMessage()+"\"}");
 			}
 		}
 	}
@@ -530,6 +497,7 @@ public final class MasterServer implements MasterProtocol {
 	public CommandResponse startPreparedTask(PreparedTask config) throws Exception {
 		Task task = taskManager.getPreparedTaskByName(config.name);
 		if (task != null){
+			task = (Task) task.clone();
 			if (!config.seeds.isEmpty()){
 				task.seeds = config.seeds;
 			}
@@ -547,10 +515,10 @@ public final class MasterServer implements MasterProtocol {
 			}
 			taskManager.addTaskTracker(tracker);
 			tracker.start();
+			return new CommandResponse(true, tracker.getId());
 		}else{
 			return new CommandResponse(false, "prepared task not exists");
 		}
-		return new CommandResponse(true);
 	}
 
 	@Override

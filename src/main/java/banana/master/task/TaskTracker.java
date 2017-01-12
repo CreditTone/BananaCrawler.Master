@@ -69,6 +69,8 @@ public class TaskTracker {
 	
 	private HashSet<TaskError> errorStash = new HashSet<TaskError>();
 	
+	private StatusChecker statusChecker;
+	
 	public TaskTracker(Task taskConfig) throws Exception {
 		this(taskConfig, null);
 	}
@@ -273,6 +275,8 @@ public class TaskTracker {
 			taskDownload.setTaskTracker(this);
 			taskDownload.start(initCookies);
 		}
+		statusChecker = new StatusChecker();
+		statusChecker.start();
 	}
 
 	public void updateConfig(Task taskConfig) throws Exception {
@@ -362,22 +366,6 @@ public class TaskTracker {
 				return req;
 			Thread.sleep(100);
 		}
-		if (isAllWaiting() && requestQueue.isEmpty()) {
-			if (seedQuerys != null && seedQuerys.canQuery()){
-				synchronized (this) {
-					if (requestQueue.isEmpty()){
-						initSeedToRequestQueue();
-						return requestQueue.poll();
-					}
-				}
-			}else{
-				new Thread(){
-					public void run() {
-						MasterServer.getInstance().stopTask(getTaskName());
-					};
-				}.start();
-			}
-		}
 		return requestQueue.poll();
 	}
 	
@@ -396,13 +384,13 @@ public class TaskTracker {
 		}
 	}
 
-	private boolean isAllWaiting() {
+	private boolean hasWorkingNode() {
 		for (RemoteDownloaderTracker rdt : downloads) {
-			if (!rdt.isWaitRequest()) {
-				return false;
+			if (rdt.isWorking()) {
+				return true;
 			}
 		}
-		return true;
+		return false;
 	}
 
 	public boolean containDownload(String ip, int port) {
@@ -466,5 +454,27 @@ public class TaskTracker {
 			}
 		}
 		logger.info(config.name + " destory finished");
+	}
+	
+	public class StatusChecker extends Thread{
+
+		@Override
+		public void run() {
+			try{
+				while(runing){
+					Thread.sleep(3 * 1000);
+					if (requestQueue.isEmpty() && !hasWorkingNode()){
+						if (seedQuerys != null && seedQuerys.canQuery()){
+							initSeedToRequestQueue();
+						}else{
+							MasterServer.getInstance().stopTaskById(taskId);
+						}
+					}
+				}
+			}catch(Exception e){
+				logger.error("", e);
+			}
+		}
+		
 	}
 }

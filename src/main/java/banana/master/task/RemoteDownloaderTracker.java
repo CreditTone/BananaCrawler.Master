@@ -68,10 +68,10 @@ public class RemoteDownloaderTracker {
 		isValid = false;
 	}
 	
-	public boolean isWaitRequest(){
+	public boolean isWorking(){
 		String taskId = taskTracker.getId();
 		try {
-			return owner.isWaitRequest(taskId);
+			return owner.isWorking(taskId);
 		} catch (DownloadException e) {
 			e.printStackTrace();
 		}

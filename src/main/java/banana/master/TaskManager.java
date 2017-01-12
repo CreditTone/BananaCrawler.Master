@@ -1,7 +1,9 @@
 package banana.master;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import banana.core.protocol.Task;
@@ -10,20 +12,14 @@ import banana.master.task.TaskTracker;
 
 public class TaskManager {
 
-	private Map<String, TaskTracker> id2Task = new HashMap<String, TaskTracker>();
-
-	private Map<String, TaskTracker> name2Task = new HashMap<String, TaskTracker>();
+	private Map<String, TaskTracker> id2TaskTracker = new HashMap<String, TaskTracker>();
 
 	private Map<String, TaskTimer> name2Tasktimer = new HashMap<String, TaskTimer>();
 
 	private Map<String, Task> name2Prepared = new HashMap<String, Task>();
 
 	public TaskTracker getTaskTrackerById(String taskid) {
-		return id2Task.get(taskid);
-	}
-
-	public TaskTracker getTaskTrackerByName(String taskname) {
-		return name2Task.get(taskname);
+		return id2TaskTracker.get(taskid);
 	}
 
 	public TaskTimer getTaskTimerByName(String taskname) {
@@ -47,23 +43,48 @@ public class TaskManager {
 	}
 
 	public void addTaskTracker(TaskTracker taskTracker) {
-		id2Task.put(taskTracker.getId(), taskTracker);
-		name2Task.put(taskTracker.getTaskName(), taskTracker);
+		id2TaskTracker.put(taskTracker.getId(), taskTracker);
 	}
 	
 	public void addPreparedTask(Task task) {
 		name2Prepared.put(task.name, task);
 	}
 
-	public void removeTaskTracker(String name) {
-		id2Task.remove(name2Task.remove(name).getId());
+	public void removeTaskTrackerById(String id) {
+		id2TaskTracker.remove(id);
 	}
 
 	public Collection<TaskTracker> allTaskTracker() {
-		return id2Task.values();
+		return id2TaskTracker.values();
 	}
 
 	public Collection<TaskTimer> allTaskTimer() {
 		return name2Tasktimer.values();
+	}
+	
+	public Collection<TaskTracker> getTaskTrackerByName(String taskname){
+		List<TaskTracker> trackers = new ArrayList<>();
+		for (TaskTracker tracker : id2TaskTracker.values()) {
+			if (tracker.getConfig().name.equals(taskname)){
+				trackers.add(tracker);
+			}
+		}
+		return trackers;
+	}
+	
+	public void verify(Task config) throws Exception {
+		if (name2Tasktimer.containsKey(config.name)){
+			throw new Exception("存在名字相同的任务定时器 "+  config.name);
+		}
+		if (name2Prepared.containsKey(config.name)){
+			throw new Exception("存在名字相同的与准备任务 "+  config.name);
+		}
+		for (TaskTracker tracker : getTaskTrackerByName(config.name)) {
+			if (tracker.getConfig().allow_multi_task != config.allow_multi_task){
+				throw new Exception("存在名字相同的任务，但配置allow_multi_task不同");
+			}else if(config.allow_multi_task == false){
+				throw new Exception("名字为" + config.name +" 已经存在。如果想多任务运行，请设置allow_multi_task为true");
+			}
+		}
 	}
 }
