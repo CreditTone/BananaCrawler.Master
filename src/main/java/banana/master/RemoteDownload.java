@@ -8,8 +8,8 @@ import org.apache.log4j.Logger;
 
 import banana.core.NodeStatus;
 import banana.core.exception.DownloadException;
+import banana.core.modle.Task;
 import banana.core.protocol.DownloadProtocol;
-import banana.core.protocol.Task;
 import banana.core.request.Cookies;
 
 public class RemoteDownload extends TimerTask {

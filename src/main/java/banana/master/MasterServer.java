@@ -2,7 +2,6 @@ package banana.master;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.rmi.RemoteException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -20,7 +19,6 @@ import java.util.Random;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.ProtocolSignature;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RPC.Server;
@@ -44,16 +42,16 @@ import com.mongodb.gridfs.GridFSDBFile;
 import banana.core.exception.CrawlerMasterException;
 import banana.core.modle.BasicWritable;
 import banana.core.modle.CommandResponse;
+import banana.core.modle.ContextModle;
 import banana.core.modle.MasterConfig;
+import banana.core.modle.PreparedTask;
+import banana.core.modle.Task;
 import banana.core.modle.TaskError;
 import banana.core.modle.TaskStatus;
+import banana.core.modle.Task.Seed;
 import banana.core.modle.TaskStatus.DownloaderTrackerStatus;
-import banana.core.modle.TaskStatus.Stat;
 import banana.core.protocol.MasterProtocol;
-import banana.core.protocol.PreparedTask;
 import banana.core.protocol.DownloadProtocol;
-import banana.core.protocol.Task;
-import banana.core.protocol.Task.Seed;
 import banana.core.request.Cookie;
 import banana.core.request.Cookies;
 import banana.core.request.HttpRequest;
@@ -83,6 +81,8 @@ public final class MasterServer implements MasterProtocol {
 	private org.eclipse.jetty.server.Server httpServer = null;
 
 	private MasterConfig config;
+	
+	private ContextModle globalContext = new AutoOverdueContext(24, 1000 * 3600);
 
 	private List<RemoteDownload> downloads = new ArrayList<RemoteDownload>();
 
@@ -140,6 +140,10 @@ public final class MasterServer implements MasterProtocol {
 		}
 		return jdbcConnection;
 	}
+	
+	public ContextModle getGlobalContext() {
+		return globalContext;
+	}
 
 	public CommandResponse registerDownloadNode(String remote, int port) {
 		for (RemoteDownload download : downloads) {
@@ -162,14 +166,6 @@ public final class MasterServer implements MasterProtocol {
 
 	public List<RemoteDownload> getDownloads() {
 		return downloads;
-	}
-
-	public Object getTaskPropertie(String taskId, String propertieName) {
-		TaskTracker task = taskManager.getTaskTrackerById(taskId);
-		if (task != null) {
-			return task.getProperties(propertieName);
-		}
-		return null;
 	}
 
 	public CommandResponse pushTaskRequest(String taskId, HttpRequest request) {
@@ -496,29 +492,28 @@ public final class MasterServer implements MasterProtocol {
 	@Override
 	public CommandResponse startPreparedTask(PreparedTask config) throws Exception {
 		Task task = taskManager.getPreparedTaskByName(config.name);
-		if (task != null){
-			task = (Task) task.clone();
-			if (!config.seeds.isEmpty()){
-				task.seeds = config.seeds;
-			}
-			TaskTracker tracker;
-			if (!config.cookies.isEmpty()){
-				Cookies cookies = new Cookies(config.cookies);
-				tracker = new TaskTracker(task, cookies);
-			}else{
-				tracker = new TaskTracker(task);
-			}
-			if (!config.taskContext.isEmpty()){
-				for (Entry<String,Object> entry:config.taskContext.entrySet()) {
-					tracker.getContext().putContextAttribute(entry.getKey(), entry.getValue());
-				}
-			}
-			taskManager.addTaskTracker(tracker);
-			tracker.start();
-			return new CommandResponse(true, tracker.getId());
-		}else{
+		if (task == null){
 			return new CommandResponse(false, "prepared task not exists");
 		}
+		task = (Task) task.clone();
+		if (!config.seeds.isEmpty()){
+			task.seeds = config.seeds;
+		}
+		TaskTracker tracker;
+		if (!config.cookies.isEmpty()){
+			Cookies cookies = new Cookies(config.cookies);
+			tracker = new TaskTracker(task, cookies);
+		}else{
+			tracker = new TaskTracker(task);
+		}
+		if (!config.taskContext.isEmpty()){
+			for (Entry<String,Object> entry:config.taskContext.entrySet()) {
+				tracker.getContext().put(entry.getKey(), entry.getValue());
+			}
+		}
+		taskManager.addTaskTracker(tracker);
+		tracker.start();
+		return new CommandResponse(true, tracker.getId());
 	}
 
 	@Override
@@ -533,7 +528,7 @@ public final class MasterServer implements MasterProtocol {
 	public BasicWritable getTaskContextAttribute(String taskid, String attribute) throws Exception {
 		TaskTracker taskTracker = taskManager.getTaskTrackerById(taskid);
 		if (taskTracker != null){
-			Object value = taskTracker.getContext().getContextAttribute(attribute);
+			Object value = taskTracker.getContext().get(attribute);
 			if (value != null){
 				return new BasicWritable(value);
 			}
@@ -545,17 +540,13 @@ public final class MasterServer implements MasterProtocol {
 	public void putTaskContextAttribute(String taskid, String attribute, BasicWritable value) throws Exception {
 		TaskTracker taskTracker = taskManager.getTaskTrackerById(taskid);
 		if (taskTracker != null){
-			taskTracker.getContext().putContextAttribute(attribute, value.getValue());
+			taskTracker.getContext().put(attribute, value.getValue());
 		}
 	}
 
 	@Override
-	public BooleanWritable taskContextIsEmpty(String taskid) {
-		TaskTracker taskTracker = taskManager.getTaskTrackerById(taskid);
-		if (taskTracker != null){
-			return new BooleanWritable(taskTracker.getContext().isEmpty());
-		}
-		return new BooleanWritable(false);
+	public void putGlobalContext(String attribute, BasicWritable value) throws Exception {
+		globalContext.put(attribute, value.getValue());
 	}
-
+	
 }

@@ -9,9 +9,8 @@ import com.mongodb.gridfs.GridFS;
 import com.mongodb.gridfs.GridFSInputFile;
 
 import banana.core.filter.Filter;
-import banana.core.modle.TaskContext;
-import banana.core.modle.TaskContextImpl;
-import banana.core.protocol.Task;
+import banana.core.modle.ContextModle;
+import banana.core.modle.Task;
 import banana.core.queue.BlockingRequestQueue;
 import banana.core.queue.DelayedPriorityBlockingQueue;
 import banana.master.MasterServer;
@@ -40,7 +39,7 @@ public class BackupRunnable extends TimerTask implements Closeable {
 		this.config = config;
 	}
 
-	public TaskContext getContext() {
+	public ContextModle getContext() {
 		return context;
 	}
 

@@ -25,10 +25,9 @@ import banana.core.filter.Filter;
 import banana.core.filter.MongoDBFilter;
 import banana.core.filter.NotFilter;
 import banana.core.filter.SimpleBloomFilter;
-import banana.core.modle.TaskContext;
-import banana.core.modle.TaskContextImpl;
+import banana.core.modle.ContextModle;
+import banana.core.modle.Task;
 import banana.core.modle.TaskError;
-import banana.core.protocol.Task;
 import banana.core.queue.BlockingRequestQueue;
 import banana.core.queue.RequestQueueBuilder;
 import banana.core.request.Cookies;
@@ -231,19 +230,8 @@ public class TaskTracker {
 		return config;
 	}
 
-	public TaskContext getContext() {
+	public ContextModle getContext() {
 		return context;
-	}
-	
-	public Object getProperties(String propertie) {
-		if (propertie == null) {
-			return config;
-		}
-		Object result = context.getContextAttribute(propertie);
-		if (result instanceof String){
-			return new Text((String) result);
-		}
-		return result;
 	}
 	
 	private void initSeedToRequestQueue() throws Exception {
@@ -263,20 +251,25 @@ public class TaskTracker {
 	}
 
 	public void start() throws Exception {
-		downloads = MasterServer.getInstance().elect(taskId, config.thread);
-		logger.info(String.format("%s 分配了%d个Downloader", taskId, downloads.size()));
-		for (RemoteDownloaderTracker rdt : downloads) {
-			logger.info(String.format("%s Downloader %s Thread %d", taskId, rdt.getIp(), rdt.getWorkThread()));
+		if (config.condition.length() == 0 || context.parseString(config.condition).equals("true")){
+			downloads = MasterServer.getInstance().elect(taskId, config.thread);
+			logger.info(String.format("%s 分配了%d个Downloader", taskId, downloads.size()));
+			for (RemoteDownloaderTracker rdt : downloads) {
+				logger.info(String.format("%s Downloader %s Thread %d", taskId, rdt.getIp(), rdt.getWorkThread()));
+			}
+			if (downloads.isEmpty()) {
+				throw new Exception("Not set any downloader");
+			}
+			for (RemoteDownloaderTracker taskDownload : downloads) {
+				taskDownload.setTaskTracker(this);
+				taskDownload.start(initCookies);
+			}
+			statusChecker = new StatusChecker();
+			statusChecker.start();
+		}else{
+			logger.info(String.format("%s task condition is false %s", taskId, config.condition));
+			MasterServer.getInstance().stopTaskById(taskId);
 		}
-		if (downloads.isEmpty()) {
-			throw new Exception("Not set any downloader");
-		}
-		for (RemoteDownloaderTracker taskDownload : downloads) {
-			taskDownload.setTaskTracker(this);
-			taskDownload.start(initCookies);
-		}
-		statusChecker = new StatusChecker();
-		statusChecker.start();
 	}
 
 	public void updateConfig(Task taskConfig) throws Exception {
@@ -432,14 +425,16 @@ public class TaskTracker {
 			return;
 		}
 		runing = false;
-		for (RemoteDownloaderTracker taskDownload : downloads) {
-			try {
-				taskDownload.stop();
-			} catch (DownloadException e) {
-				e.printStackTrace();
+		if (downloads != null){
+			for (RemoteDownloaderTracker taskDownload : downloads) {
+				try {
+					taskDownload.stop();
+				} catch (DownloadException e) {
+					e.printStackTrace();
+				}
 			}
+			logger.info("downloaderTracker closed");
 		}
-		logger.info("downloaderTracker closed");
 		if (backupRunnable != null){
 			logger.info("begin backup stats");
 			backupRunnable.close();

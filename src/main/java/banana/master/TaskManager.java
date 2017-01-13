@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import banana.core.protocol.Task;
+import banana.core.modle.Task;
 import banana.master.task.TaskTimer;
 import banana.master.task.TaskTracker;
 

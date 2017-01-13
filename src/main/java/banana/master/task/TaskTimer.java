@@ -9,7 +9,7 @@ import banana.core.modle.TaskStatus.Stat;
 
 public class TaskTimer extends java.util.TimerTask {
 
-	public banana.core.protocol.Task cfg;
+	public banana.core.modle.Task cfg;
 
 	private Timer timer;
 	
@@ -17,12 +17,12 @@ public class TaskTimer extends java.util.TimerTask {
 
 	public TaskTracker tracker;
 	
-	public TaskTimer(banana.core.protocol.Task cfg) {
+	public TaskTimer(banana.core.modle.Task cfg) {
 		this.cfg = cfg;
 		this.timer = new Timer();
 	}
 
-	public void start() throws ParseException {
+	public void start() throws Exception {
 		Date firstTime = null;
 		if (cfg.mode.timer.first_start.equals("now")) {
 			firstTime = new Date(System.currentTimeMillis() + 10000);

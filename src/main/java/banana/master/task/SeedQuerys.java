@@ -25,7 +25,7 @@ import banana.master.MasterServer;
 
 public class SeedQuerys {
 	
-	public banana.core.protocol.Task.SeedQuery seed_query;
+	public banana.core.modle.Task.SeedQuery seed_query;
 	
 	private String collection;
 	
@@ -39,7 +39,7 @@ public class SeedQuerys {
 	
 	private boolean canQuery = true;
 	
-	public SeedQuerys(String collection,banana.core.protocol.Task.SeedQuery seed_query){
+	public SeedQuerys(String collection,banana.core.modle.Task.SeedQuery seed_query){
 		this.collection = collection;
 		this.seed_query = seed_query;
 		if (seed_query.find.containsKey("sql")){
