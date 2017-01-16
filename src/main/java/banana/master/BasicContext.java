@@ -66,6 +66,9 @@ public class BasicContext extends HashMap<String,Object> implements ContextModle
 	}
 	
 	public boolean existPath(String path) {
+		if (path == null){
+			return false;
+		}
 		String[] keys = path.split("\\.");
 		Object value = get(keys[0]);
 		for (int i = 1; i < keys.length; i++) {
