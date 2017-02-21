@@ -6,12 +6,12 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.io.Text;
 import org.apache.log4j.Logger;
 
 import com.mongodb.BasicDBObject;
@@ -71,13 +71,17 @@ public class TaskTracker {
 	private StatusChecker statusChecker;
 	
 	public TaskTracker(Task taskConfig) throws Exception {
-		this(taskConfig, null);
+		this(taskConfig, null, null);
 	}
 	
-	public TaskTracker(Task taskConfig,Cookies initCookies) throws Exception {
+	public TaskTracker(Task task, Map<String, Object> prepradContext) throws Exception {
+		this(task, prepradContext, null);
+	}
+	
+	public TaskTracker(Task taskConfig,Map<String,Object> prepradContext,Cookies initCookies) throws Exception {
 		config = taskConfig;
 		taskId = taskConfig.name + "_" + new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
-		context = new TaskContextImpl();
+		context = new TaskContextImpl(prepradContext);
 		initContext(config.seeds, config.seed_query);
 		initFilter(config.filter);
 		initQueue(config.queue);
@@ -119,7 +123,7 @@ public class TaskTracker {
 				}
 			}
 			for (int i = 0; urls != null && i < urls.length; i++) {
-				HttpRequest req = RequestBuilder.custom().setUrl(urls[i]).setProcessor(seed.processor).build();
+				HttpRequest req = RequestBuilder.custom().setUrl(context.parseString(urls[i])).setProcessor(seed.processor).build();
 				if (seed.method == null || "GET".equalsIgnoreCase(seed.method)){
 					req.setMethod(HttpRequest.Method.GET);
 				}else{
@@ -138,12 +142,12 @@ public class TaskTracker {
 			}
 			String[] downloads = null;
 			if (seed.download != null){
-				urls = new String[]{seed.download};
+				downloads = new String[]{seed.download};
 			}else if (seed.downloads != null){
-				urls = seed.downloads;
+				downloads = seed.downloads;
 			}
 			for (int i = 0; downloads != null && i < downloads.length; i++) {
-				HttpRequest req = RequestBuilder.custom().setDownload(downloads[i]).setProcessor("").build();
+				HttpRequest req = RequestBuilder.custom().setDownload(context.parseString(downloads[i])).setProcessor(seed.processor).build();
 				if (seed.method == null || "GET".equalsIgnoreCase(seed.method)){
 					req.setMethod(HttpRequest.Method.GET);
 				}else{
@@ -195,7 +199,6 @@ public class TaskTracker {
 		requestQueue = builder.build();
 	}
 	
-
 	private void initPreviousLinks(boolean synchronizeLinks,String name,String collection) throws Exception {
 		GridFS tracker_status = new GridFS(MasterServer.getInstance().getMongoDB(),"tracker_stat");
 		GridFSDBFile file = tracker_status.findOne(name + "_" + collection + "_filter");

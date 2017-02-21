@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Map.Entry;
 
 import com.alibaba.fastjson.JSON;
 import com.github.jknack.handlebars.Helper;
@@ -94,6 +95,14 @@ public final class TaskContextImpl extends BytesWritable implements ContextModle
 	}
 	
 	
+	public TaskContextImpl(Map<String, Object> prepradContext) {
+		if (prepradContext != null){
+			for (Entry<String,Object> entry : prepradContext.entrySet()) {
+				put(entry.getKey(), entry.getValue());
+			}
+		}
+	}
+
 	/**
 	 * 注入种子
 	 * @param request

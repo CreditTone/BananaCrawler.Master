@@ -502,14 +502,9 @@ public final class MasterServer implements MasterProtocol {
 		TaskTracker tracker;
 		if (!config.cookies.isEmpty()){
 			Cookies cookies = new Cookies(config.cookies);
-			tracker = new TaskTracker(task, cookies);
+			tracker = new TaskTracker( task, config.taskContext, cookies);
 		}else{
-			tracker = new TaskTracker(task);
-		}
-		if (!config.taskContext.isEmpty()){
-			for (Entry<String,Object> entry:config.taskContext.entrySet()) {
-				tracker.getContext().put(entry.getKey(), entry.getValue());
-			}
+			tracker = new TaskTracker( task, config.taskContext);
 		}
 		taskManager.addTaskTracker(tracker);
 		tracker.start();
