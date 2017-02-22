@@ -86,7 +86,9 @@ public class TaskTracker {
 		initFilter(config.filter);
 		initQueue(config.queue);
 		setBackup();
-		initPreviousLinks(config.synchronizeLinks, config.name, config.collection);
+		if (config.mode == null || !config.mode.prepared){
+			initPreviousStatus(config.synchronizeLinks, config.name, config.collection);
+		}
 		initSeedToRequestQueue();
 		this.initCookies = initCookies;
 		logger.info(String.format("TaskTracker %s use filter %s", taskId, filter.getClass().getName()));
@@ -199,7 +201,7 @@ public class TaskTracker {
 		requestQueue = builder.build();
 	}
 	
-	private void initPreviousLinks(boolean synchronizeLinks,String name,String collection) throws Exception {
+	private void initPreviousStatus(boolean synchronizeLinks,String name,String collection) throws Exception {
 		GridFS tracker_status = new GridFS(MasterServer.getInstance().getMongoDB(),"tracker_stat");
 		GridFSDBFile file = tracker_status.findOne(name + "_" + collection + "_filter");
 		if (file != null){
@@ -234,6 +236,7 @@ public class TaskTracker {
 	}
 
 	public ContextModle getContext() {
+		//System.out.println(taskId+"取数据前打印:"+context.values());
 		return context;
 	}
 	
