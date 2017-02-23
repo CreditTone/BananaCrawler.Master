@@ -1,7 +1,6 @@
 package banana.master.task;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -23,7 +22,7 @@ import banana.core.request.HttpRequest.Method;
 import banana.core.request.RequestBuilder;
 import banana.master.MasterServer;
 
-public class SeedQuerys {
+public class SeedQuery {
 	
 	public banana.core.modle.Task.SeedQuery seed_query;
 	
@@ -39,7 +38,7 @@ public class SeedQuerys {
 	
 	private boolean canQuery = true;
 	
-	public SeedQuerys(String collection,banana.core.modle.Task.SeedQuery seed_query){
+	public SeedQuery(String collection,banana.core.modle.Task.SeedQuery seed_query){
 		this.collection = collection;
 		this.seed_query = seed_query;
 		if (seed_query.find.containsKey("sql")){

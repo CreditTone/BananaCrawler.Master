@@ -54,7 +54,7 @@ public class TaskTracker {
 
 	private BlockingRequestQueue requestQueue;
 	
-	private SeedQuerys seedQuerys;
+	private SeedQuery seedQuery;
 
 	private TaskContextImpl context;
 
@@ -82,12 +82,12 @@ public class TaskTracker {
 		config = taskConfig;
 		taskId = taskConfig.name + "_" + new SimpleDateFormat("yyyyMMddHHmmssSSS").format(new Date());
 		context = new TaskContextImpl(prepradContext);
-		initContext(config.seeds, config.seed_query);
+		initContext(config.seed.init.seeds, config.seed.init.seed_query);
 		initFilter(config.filter);
 		initQueue(config.queue);
-		setBackup();
 		if (config.mode == null || !config.mode.prepared){
 			initPreviousStatus(config.synchronizeLinks, config.name, config.collection);
+			setBackup();
 		}
 		initSeedToRequestQueue();
 		this.initCookies = initCookies;
@@ -111,6 +111,7 @@ public class TaskTracker {
 	}
 	
 	private void initContext(List<Task.Seed> seeds,Task.SeedQuery seedQuery) throws IOException{
+		context.clearSeeds();//清除之前的种子
 		for (Task.Seed seed : seeds) {
 			String[] urls = null;
 			if (seed.url != null){
@@ -168,7 +169,7 @@ public class TaskTracker {
 			}
 		}
 		if (seedQuery != null){
-			this.seedQuerys = new SeedQuerys(config.collection, seedQuery);
+			this.seedQuery = new SeedQuery(config.collection, seedQuery);
 		}
 	}
 	
@@ -236,7 +237,6 @@ public class TaskTracker {
 	}
 
 	public ContextModle getContext() {
-		//System.out.println(taskId+"取数据前打印:"+context.values());
 		return context;
 	}
 	
@@ -248,8 +248,8 @@ public class TaskTracker {
 		for (HttpRequest req : seeds) {
 			requestQueue.add(req);
 		}
-		if (seedQuerys != null){
-			List<HttpRequest> generators = seedQuerys.query();
+		if (seedQuery != null){
+			List<HttpRequest> generators = seedQuery.query();
 			for (HttpRequest req : generators) {
 				requestQueue.add(req);
 			}
@@ -458,6 +458,8 @@ public class TaskTracker {
 	}
 	
 	public class StatusChecker extends Thread{
+		
+		private boolean finishedTask = false;
 
 		@Override
 		public void run() {
@@ -465,8 +467,16 @@ public class TaskTracker {
 				while(runing){
 					Thread.sleep(3 * 1000);
 					if (requestQueue.isEmpty() && !hasWorkingNode()){
-						if (seedQuerys != null && seedQuerys.canQuery()){
+						if (seedQuery != null && seedQuery.canQuery()){
 							initSeedToRequestQueue();
+						}else if (!finishedTask){
+							if (config.seed.after != null){
+								initContext(config.seed.after.seeds, config.seed.after.seed_query);
+								initSeedToRequestQueue();
+								logger.info(String.format("TaskTracker %s task finished", taskId));
+								logger.info(String.format("TaskTracker %s init after seeds", taskId));
+							}
+							finishedTask = true;
 						}else{
 							MasterServer.getInstance().stopTaskById(taskId);
 						}

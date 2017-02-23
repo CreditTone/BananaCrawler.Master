@@ -497,7 +497,7 @@ public final class MasterServer implements MasterProtocol {
 		}
 		task = (Task) task.clone();
 		if (!config.seeds.isEmpty()){
-			task.seeds = config.seeds;
+			task.seed.init.seeds = config.seeds;
 		}
 		TaskTracker tracker;
 		if (!config.cookies.isEmpty()){

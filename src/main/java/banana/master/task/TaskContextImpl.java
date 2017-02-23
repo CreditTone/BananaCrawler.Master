@@ -200,6 +200,11 @@ public final class TaskContextImpl extends BytesWritable implements ContextModle
 	@Override
 	public void clear() {
 		contextAttribute.clear();
+		seeds.clear();
+	}
+	
+	public void clearSeeds(){
+		seeds.clear();
 	}
 
 	@Override
