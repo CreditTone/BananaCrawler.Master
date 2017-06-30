@@ -56,6 +56,7 @@ import banana.core.request.Cookie;
 import banana.core.request.Cookies;
 import banana.core.request.HttpRequest;
 import banana.core.util.DateCodec;
+import banana.master.serlvet.GjpRsaServlet;
 import banana.master.task.RemoteDownloaderTracker;
 import banana.master.task.TaskTimer;
 import banana.master.task.TaskTracker;
@@ -406,6 +407,7 @@ public final class MasterServer implements MasterProtocol {
 		ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
 		context.addServlet(new ServletHolder(new InjectCookiesServlet()), "/injectCookies");
 		context.addServlet(new ServletHolder(new StartPreparedTaskServlet()), "/startPreparedTask");
+		context.addServlet(new ServletHolder(new GjpRsaServlet()), "/service/gjprsa");
 		httpServer.setHandler(context);
 		httpServer.start();
 	}
