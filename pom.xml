@@ -45,10 +45,15 @@
 			<version>9.4.0.v20161208</version>
 		</dependency>
 		<dependency>
-    <groupId>bouncycastle</groupId>
-    <artifactId>bcprov-jdk15</artifactId>
-    <version>140</version>
-</dependency>
-		
+			<groupId>bouncycastle</groupId>
+			<artifactId>bcprov-jdk15</artifactId>
+			<version>140</version>
+		</dependency>
+		<!-- https://mvnrepository.com/artifact/com.google.guava/guava -->
+		<dependency>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
+			<version>19.0</version>
+		</dependency>
 	</dependencies>
 </project>

@@ -70,7 +70,7 @@ public class BackupRunnable extends TimerTask implements Closeable {
 		}
 		GridFS tracker_status = new GridFS(MasterServer.getInstance().getMongoDB(),"tracker_stat");
 		if (filter != null){
-			String filename = config.name + "_" + config.collection + "_filter";
+			String filename = config.name + "&" + config.collection + "&filter";
 			byte[] filterData = filter.toBytes();
 			if (filterData != null){
 				tracker_status.remove(filename);
@@ -79,7 +79,7 @@ public class BackupRunnable extends TimerTask implements Closeable {
 				file.save();
 			}
 		}
-		String filename = config.name + "_" + config.collection + "_context";
+		String filename = config.name + "&" + config.collection + "&context";
 		tracker_status.remove(filename);
 		byte[] contextData = context.toBytes();
 		GridFSInputFile file = tracker_status.createFile(contextData);
@@ -89,7 +89,7 @@ public class BackupRunnable extends TimerTask implements Closeable {
 	
 	private void backupLinks(){
 		GridFS tracker_status = new GridFS(MasterServer.getInstance().getMongoDB(),"tracker_stat");
-		String filename = config.name + "_" + config.collection + "_links";
+		String filename = config.name + "&" + config.collection + "&links";
 		tracker_status.remove(filename);
 		GridFSInputFile file = tracker_status.createFile(requestQueue.toBytes());
 		file.setFilename(filename);

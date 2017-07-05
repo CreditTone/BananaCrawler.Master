@@ -32,6 +32,7 @@ import banana.core.queue.BlockingRequestQueue;
 import banana.core.queue.RequestQueueBuilder;
 import banana.core.request.Cookies;
 import banana.core.request.HttpRequest;
+import banana.core.request.PageRequest.PageEncoding;
 import banana.core.request.RequestBuilder;
 import banana.core.util.SystemUtil;
 import banana.master.MasterServer;
@@ -204,18 +205,18 @@ public class TaskTracker {
 	
 	private void initPreviousStatus(boolean synchronizeLinks,String name,String collection) throws Exception {
 		GridFS tracker_status = new GridFS(MasterServer.getInstance().getMongoDB(),"tracker_stat");
-		GridFSDBFile file = tracker_status.findOne(name + "_" + collection + "_filter");
+		GridFSDBFile file = tracker_status.findOne(name + "&" + collection + "&filter");
 		if (file != null){
 			byte[] filterData = SystemUtil.inputStreamToBytes(file.getInputStream());
 			filter.load(filterData);
 		}
-		file = tracker_status.findOne(name + "_" + collection + "_context");
+		file = tracker_status.findOne(name + "&" + collection + "&context");
 		if (file != null){
 			byte[] contextData = SystemUtil.inputStreamToBytes(file.getInputStream());
 			context.load(contextData);
 		}
 		if (synchronizeLinks){
-			file = tracker_status.findOne(name + "_" + collection + "_links");
+			file = tracker_status.findOne(name + "&" + collection + "&links");
 			if (file != null){
 				byte[] data = SystemUtil.inputStreamToBytes(file.getInputStream());
 				requestQueue.load(new ByteArrayInputStream(data));
