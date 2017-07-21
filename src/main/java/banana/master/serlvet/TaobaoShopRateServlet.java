@@ -1,9 +1,7 @@
 package banana.master.serlvet;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.util.concurrent.TimeUnit;
 
 import javax.servlet.ServletException;
@@ -11,13 +9,13 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.bouncycastle.util.encoders.Hex;
 import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.RemoteWebDriver;
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 
-public class AlipayUAServlet extends HttpServlet {
+public class TaobaoShopRateServlet extends HttpServlet {
 	
 	
 	private static RemoteWebDriver webDriver = null;
@@ -25,7 +23,7 @@ public class AlipayUAServlet extends HttpServlet {
 	private static void initWebDriver(){
 		try {
 			//The browser version, or the empty string if unknown.
-			DesiredCapabilities desiredCapabilities = DesiredCapabilities.firefox();
+			DesiredCapabilities desiredCapabilities = DesiredCapabilities.phantomjs();
 			//desiredCapabilities.setCapability(InternetExplorerDriver.INTRODUCE_FLAKINESS_BY_IGNORING_SECURITY_DOMAINS, true);
 			webDriver = new RemoteWebDriver(new URL("http://127.0.0.1:8888/wd/hub"),desiredCapabilities);
 //			webDriver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);//组件查找超时
@@ -39,21 +37,23 @@ public class AlipayUAServlet extends HttpServlet {
 	@Override
 	public void init() throws ServletException {
 		super.init();
-		//initWebDriver();
-		//webDriver.get("https://consumeprod.alipay.com/record/advanced.htm");
+		initWebDriver();
+		webDriver.get("https://rate.taobao.com/user-rate-UvFNLvmcuOFvuvWTT.htm?spm=a1z10.1-c-s.0.0.41fe2e6aGCRrHp");
 	}
 
 	@Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-		String form_tk = req.getParameter("form_tk");
-		webDriver.executeScript("UA_Opt.Token='"+form_tk+"'");
-		webDriver.executeScript("UA_Opt.reload()");
-		System.out.println(webDriver.executeScript("return UA_Opt"));
-		Object json_ua = webDriver.executeScript("return json_ua");
-		Object token = webDriver.executeScript("return UA_Opt.Token");
+		String userNumId = req.getParameter("userNumId");
+		String shopID = req.getParameter("shopID");
+		webDriver.get("https://rate.taobao.com/ShopService4C.htm?userNumId="+userNumId+"&shopID="+shopID+"&isB2C=true");
+		String content = webDriver.getPageSource();
 		JSONObject ret = new JSONObject();
-		ret.put("json_ua", json_ua);
-		ret.put("token", token);
+		if (content.contains("avgRefund")){
+			int startIndex = content.indexOf("{");
+			int endIndex = content.lastIndexOf("}")+1;
+			content = content.substring(startIndex, endIndex);
+			ret = JSON.parseObject(content);
+		}
 		resp.getWriter().write(ret.toJSONString());
 	}
 
@@ -62,7 +62,7 @@ public class AlipayUAServlet extends HttpServlet {
 	@Override
 	public void destroy() {
 		super.destroy();
-		//webDriver.quit();
+		webDriver.quit();
 	}
 	
 }
