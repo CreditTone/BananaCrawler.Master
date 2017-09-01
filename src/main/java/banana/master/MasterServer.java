@@ -56,7 +56,9 @@ import banana.core.request.Cookie;
 import banana.core.request.Cookies;
 import banana.core.request.HttpRequest;
 import banana.core.util.DateCodec;
+import banana.master.serlvet.DoulabaoCookieServlet;
 import banana.master.serlvet.GjpRsaServlet;
+import banana.master.serlvet.TaobaoConvertLoanData;
 import banana.master.serlvet.TaobaoCreateTimeServlet;
 import banana.master.serlvet.TaobaoShopRateServlet;
 import banana.master.task.RemoteDownloaderTracker;
@@ -412,6 +414,8 @@ public final class MasterServer implements MasterProtocol {
 		context.addServlet(new ServletHolder(new GjpRsaServlet()), "/service/gjprsa");
 		context.addServlet(new ServletHolder(new TaobaoShopRateServlet()), "/service/taobaoShopRate");
 		context.addServlet(new ServletHolder(new TaobaoCreateTimeServlet()), "/service/taobaoCreatetime");
+		context.addServlet(new ServletHolder(new TaobaoConvertLoanData()), "/service/taobaoConvertLoanData");
+		context.addServlet(new ServletHolder(new DoulabaoCookieServlet()), "/service/doulabaoCookie");
 		httpServer.setHandler(context);
 		httpServer.start();
 	}
