@@ -326,14 +326,21 @@ public final class MasterServer implements MasterProtocol {
 	}
 
 	@Override
-	public BooleanWritable filterQuery(String taskId, String... fields) {
+	public BooleanWritable filterQuery(String taskId, String fieldValue) {
 		TaskTracker task = taskManager.getTaskTrackerById(taskId);
 		if (task != null) {
-			boolean result = task.filterQuery(fields);
-			task.addFilter(fields);
+			boolean result = task.filterQuery(fieldValue);
 			return new BooleanWritable(result);
 		}
 		return null;
+	}
+	
+	@Override
+	public void addFilterField(String taskId, String fieldValue) {
+		TaskTracker task = taskManager.getTaskTrackerById(taskId);
+		if (task != null) {
+			task.addFilter(fieldValue);
+		}
 	}
 
 	@Override

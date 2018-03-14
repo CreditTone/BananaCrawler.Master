@@ -12,8 +12,6 @@ import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import com.github.jknack.handlebars.Helper;
-import com.github.jknack.handlebars.Options;
 import com.github.jknack.handlebars.Template;
 
 import banana.core.ExpandHandlebars;
@@ -24,30 +22,6 @@ public class AutoOverdueContext implements ContextModle {
 	private static final ExpandHandlebars handlebars = new ExpandHandlebars();
 	
 	static{
-		handlebars.registerHelper("existKey", new Helper<Object>() {
-
-			public Object apply(Object context, Options options) throws IOException {
-				String path = options.param(0);
-				AutoOverdueContext globalContext = (AutoOverdueContext) options.context.model();
-				return globalContext.existPath(path);
-			}
-		});
-		handlebars.registerHelper("notEmpty", new Helper<Object>() {
-
-			public Object apply(Object context, Options options) throws IOException {
-				String path = options.param(0);
-				AutoOverdueContext globalContext = (AutoOverdueContext) options.context.model();
-				return globalContext.existPath(path);
-			}
-		});
-		handlebars.registerHelper("isEmpty", new Helper<Object>() {
-
-			public Object apply(Object context, Options options) throws IOException {
-				String path = options.param(0);
-				AutoOverdueContext globalContext = (AutoOverdueContext) options.context.model();
-				return !globalContext.existPath(path);
-			}
-		});
 	}
 	
 	private LinkedList<ContextModle> allContextModle ;
@@ -224,18 +198,6 @@ public class AutoOverdueContext implements ContextModle {
 		while(iter.hasNext()){
 			iter.next().copyTo(dst);
 		}
-	}
-	
-	
-	@Override
-	public boolean existPath(String path) {
-		Iterator<ContextModle> iter = allContextModle.iterator();
-		while(iter.hasNext()){
-			if (iter.next().existPath(path)){
-				return true;
-			}
-		}
-		return false;
 	}
 	
 }

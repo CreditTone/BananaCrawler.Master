@@ -9,11 +9,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.Map.Entry;
 
 import com.alibaba.fastjson.JSON;
-import com.github.jknack.handlebars.Helper;
-import com.github.jknack.handlebars.Options;
 import com.github.jknack.handlebars.Template;
 
 import banana.core.BytesWritable;
@@ -34,30 +31,6 @@ public final class TaskContextImpl extends BytesWritable implements ContextModle
 	private static final ExpandHandlebars handlebars = new ExpandHandlebars();
 	
 	static{
-		handlebars.registerHelper("existKey", new Helper<Object>() {
-
-			public Object apply(Object context, Options options) throws IOException {
-				String path = options.param(0);
-				TaskContextImpl taskContext = (TaskContextImpl) options.context.model();
-				return taskContext.existPath(path);
-			}
-		});
-		handlebars.registerHelper("notEmpty", new Helper<Object>() {
-
-			public Object apply(Object context, Options options) throws IOException {
-				String path = options.param(0);
-				TaskContextImpl taskContext = (TaskContextImpl) options.context.model();
-				return taskContext.existPath(path);
-			}
-		});
-		handlebars.registerHelper("isEmpty", new Helper<Object>() {
-
-			public Object apply(Object context, Options options) throws IOException {
-				String path = options.param(0);
-				TaskContextImpl taskContext = (TaskContextImpl) options.context.model();
-				return !taskContext.existPath(path);
-			}
-		});
 	}
 	
 	private final BasicContext contextAttribute = new BasicContext();
@@ -244,12 +217,4 @@ public final class TaskContextImpl extends BytesWritable implements ContextModle
 		contextAttribute.copyTo(dst);
 	}
 
-	@Override
-	public boolean existPath(String path) {
-		if (contextAttribute.existPath(path)){
-			return true;
-		}
-		return MasterServer.getInstance().getGlobalContext().existPath(path);
-	}
-	
 }

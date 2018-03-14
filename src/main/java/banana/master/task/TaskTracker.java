@@ -369,19 +369,12 @@ public class TaskTracker {
 		return requestQueue.poll();
 	}
 	
-	public synchronized boolean filterQuery(String ... fields){
-		for (int i = 0; i < fields.length; i++) {
-			if (!filter.contains(fields[i])){
-				return false;
-			}
-		}
-		return true;
+	public synchronized boolean filterQuery(String fieldValue){
+		return filter.contains(fieldValue);
 	}
 	
-	public void addFilter(String ... fields){
-		for (int i = 0; i < fields.length; i++) {
-			filter.add(fields[i]);
-		}
+	public synchronized void addFilter(String fieldValue) {
+		filter.add(fieldValue);
 	}
 
 	private boolean hasWorkingNode() {
