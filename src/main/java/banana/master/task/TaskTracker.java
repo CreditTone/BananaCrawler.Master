@@ -27,6 +27,7 @@ import banana.core.filter.NotFilter;
 import banana.core.filter.SimpleBloomFilter;
 import banana.core.modle.ContextModle;
 import banana.core.modle.Task;
+import banana.core.modle.Task.FilterConfig;
 import banana.core.modle.TaskError;
 import banana.core.queue.BlockingRequestQueue;
 import banana.core.queue.RequestQueueBuilder;
@@ -87,7 +88,7 @@ public class TaskTracker {
 		initFilter(config.filter);
 		initQueue(config.queue);
 		if (config.mode == null || !config.mode.prepared){
-			initPreviousStatus(config.synchronizeLinks, config.name, config.collection);
+			initPreviousStatus();
 			setBackup();
 		}
 		initSeedToRequestQueue();
@@ -174,17 +175,15 @@ public class TaskTracker {
 		}
 	}
 	
-	private void initFilter(String filter){
+	private void initFilter(FilterConfig filter){
 		this.filter = new NotFilter();
-		if (filter.length() > 0) {
-			switch (filter) {
-			case "simple":
-				this.filter = new SimpleBloomFilter();
-				break;
-			case "mongo":
-				this.filter = new MongoDBFilter(MasterServer.getInstance().getMongoDB().getCollection(config.collection));
-				break;
-			}
+		switch (filter.type) {
+		case "simple":
+			this.filter = new SimpleBloomFilter();
+			break;
+		case "mongo":
+			this.filter = new MongoDBFilter(MasterServer.getInstance().getMongoDB().getCollection(config.collection));
+			break;
 		}
 	}
 	
@@ -203,25 +202,31 @@ public class TaskTracker {
 		requestQueue = builder.build();
 	}
 	
-	private void initPreviousStatus(boolean synchronizeLinks,String name,String collection) throws Exception {
+	private void initPreviousStatus() throws Exception {
+		if (config.reset) {//重置状态为真则不加载上次的状态
+			return;
+		}
 		GridFS tracker_status = new GridFS(MasterServer.getInstance().getMongoDB(),"tracker_stat");
-		GridFSDBFile file = tracker_status.findOne(name + "&" + collection + "&filter");
+		String filterFilename = config.filter.store != null?config.filter.store:config.name + "&" + config.name + "&filter";
+		GridFSDBFile file = tracker_status.findOne(filterFilename);
 		if (file != null){
 			byte[] filterData = SystemUtil.inputStreamToBytes(file.getInputStream());
 			filter.load(filterData);
+			logger.info("加载过滤器:"+filterFilename);
 		}
-		file = tracker_status.findOne(name + "&" + collection + "&context");
+		String contextFilename = filterFilename + "&context";
+		file = tracker_status.findOne(contextFilename);
 		if (file != null){
 			byte[] contextData = SystemUtil.inputStreamToBytes(file.getInputStream());
 			context.load(contextData);
+			logger.info("加载上下文:"+contextFilename);
 		}
-		if (synchronizeLinks){
-			file = tracker_status.findOne(name + "&" + collection + "&links");
-			if (file != null){
-				byte[] data = SystemUtil.inputStreamToBytes(file.getInputStream());
-				requestQueue.load(new ByteArrayInputStream(data));
-				logger.info(String.format("load last time requests %d", requestQueue.size()));
-			}
+		String linksFilename = filterFilename + "&links";
+		file = tracker_status.findOne(linksFilename);
+		if (file != null){
+			byte[] data = SystemUtil.inputStreamToBytes(file.getInputStream());
+			requestQueue.load(new ByteArrayInputStream(data));
+			logger.info(String.format("加载links:%s 数量:%d", linksFilename, requestQueue.size()));
 		}
 	}
 	
