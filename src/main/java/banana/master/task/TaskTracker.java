@@ -11,6 +11,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 
@@ -117,15 +119,22 @@ public class TaskTracker {
 		for (Task.Seed seed : seeds) {
 			String[] urls = null;
 			if (seed.url != null){
-				urls = new String[]{seed.url};
+				Matcher matcher = Pattern.compile("\\[(\\d+)\\-(\\d+)\\]").matcher(seed.url);
+				if (matcher.find()) {
+					List<String> genarateUrls = new ArrayList<String>();
+					String oldStr = matcher.group();
+					int startNumber = Integer.parseInt(matcher.group(1));
+					int endNumber = Integer.parseInt(matcher.group(2));
+					for (int i = startNumber; i < endNumber; i++) {
+						genarateUrls.add(seed.url.replace(oldStr, String.valueOf(i)));
+					}
+					urls = new String[genarateUrls.size()];
+					genarateUrls.toArray(urls);
+				}else {
+					urls = new String[]{seed.url};
+				}
 			}else if (seed.urls != null){
 				urls = seed.urls;
-			}else if (seed.url_iterator != null && !seed.url_iterator.isEmpty()){
-				List<Map<String,Object>> dataUrls = new ExpandHandlebars().toFor(seed.url_iterator);
-				urls = new String[dataUrls.size()];
-				for (int i = 0; i < urls.length; i++) {
-					urls[i] = (String) dataUrls.get(i).get("url");
-				}
 			}
 			for (int i = 0; urls != null && i < urls.length; i++) {
 				HttpRequest req = RequestBuilder.custom().setUrl(context.parseString(urls[i])).setProcessor(seed.processor).build();
