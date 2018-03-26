@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 
+import com.github.jknack.handlebars.Template;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBCollection;
 import com.mongodb.gridfs.GridFS;
@@ -115,18 +116,28 @@ public class TaskTracker {
 	}
 	
 	private void initContext(List<Task.Seed> seeds,Task.SeedQuery seedQuery) throws IOException{
-		context.clearSeeds();//清除之前的种子
+		context.clearSeeds();
 		for (Task.Seed seed : seeds) {
 			String[] urls = null;
 			if (seed.url != null){
-				Matcher matcher = Pattern.compile("\\[(\\d+)\\-(\\d+)\\]").matcher(seed.url);
+				Matcher matcher = Pattern.compile("\\[([^\\-]+)\\-(\\d+)\\]").matcher(seed.url);
 				if (matcher.find()) {
 					List<String> genarateUrls = new ArrayList<String>();
 					String oldStr = matcher.group();
-					int startNumber = Integer.parseInt(matcher.group(1));
 					int endNumber = Integer.parseInt(matcher.group(2));
-					for (int i = startNumber; i < endNumber; i++) {
-						genarateUrls.add(seed.url.replace(oldStr, String.valueOf(i)));
+					if (matcher.group(1).contains("{{")) {
+						ExpandHandlebars expandHandlebars = new ExpandHandlebars();
+						Template template = expandHandlebars.compileEscapeInline(matcher.group(1));
+						for (int i = 0 ;i < endNumber ; i++) {
+							String r = template.apply(null);
+							String newUrl = seed.url.replace(matcher.group(), r);
+							genarateUrls.add(newUrl);
+						}
+					}else {
+						int startNumber = Integer.parseInt(matcher.group(1));
+						for (int i = startNumber; i < endNumber; i++) {
+							genarateUrls.add(seed.url.replace(oldStr, String.valueOf(i)));
+						}
 					}
 					urls = new String[genarateUrls.size()];
 					genarateUrls.toArray(urls);
