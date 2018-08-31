@@ -22,7 +22,7 @@ import com.mongodb.DBCollection;
 import com.mongodb.gridfs.GridFS;
 import com.mongodb.gridfs.GridFSDBFile;
 
-import banana.core.ExpandHandlebars;
+import banana.core.context.ExpandHandlebars;
 import banana.core.exception.DownloadException;
 import banana.core.filter.Filter;
 import banana.core.filter.MongoDBFilter;
@@ -67,7 +67,7 @@ public class TaskTracker {
 	
 	private BackupRunnable backupRunnable;
 	
-	private boolean runing = true;
+	private  volatile boolean runing = true;
 	
 	private Cookies initCookies;
 	
@@ -294,7 +294,9 @@ public class TaskTracker {
 			}
 			for (RemoteDownloaderTracker taskDownload : downloads) {
 				taskDownload.setTaskTracker(this);
+				logger.info("start downloaderTracker hash "+taskDownload.hashCode());
 				taskDownload.start(initCookies);
+				logger.info("start downloaderTracker finished hash "+taskDownload.hashCode());
 			}
 			statusChecker = new StatusChecker();
 			statusChecker.start();
@@ -302,6 +304,7 @@ public class TaskTracker {
 			logger.info(String.format("%s task condition is false %s", taskId, config.condition));
 			MasterServer.getInstance().stopTaskById(taskId);
 		}
+		logger.info("taskTracker start finished");
 	}
 
 	public void updateConfig(Task taskConfig) throws Exception {
@@ -449,6 +452,7 @@ public class TaskTracker {
 		if (runing == false){
 			return;
 		}
+		logger.info(taskId +" destoryTask");
 		runing = false;
 		if (downloads != null){
 			for (RemoteDownloaderTracker taskDownload : downloads) {
@@ -483,8 +487,9 @@ public class TaskTracker {
 		@Override
 		public void run() {
 			try{
+				int requestQueueEmptyCount = 0;
 				while(runing){
-					Thread.sleep(3 * 1000);
+					Thread.sleep(10 * 1000);
 					if (requestQueue.isEmpty() && !hasWorkingNode()){
 						if (seedQuery != null && seedQuery.canQuery()){
 							initSeedToRequestQueue();
@@ -497,12 +502,19 @@ public class TaskTracker {
 							}
 							finishedTask = true;
 						}else{
+							if (requestQueueEmptyCount < 4) {
+								requestQueueEmptyCount ++;
+								continue;
+							}
+							runing = false;
+							logger.info("stopTaskById "+taskId);
 							MasterServer.getInstance().stopTaskById(taskId);
 						}
 					}
+					requestQueueEmptyCount = 0;
 				}
 			}catch(Exception e){
-				logger.error("", e);
+				logger.error("StatusChecker ", e);
 			}
 		}
 		

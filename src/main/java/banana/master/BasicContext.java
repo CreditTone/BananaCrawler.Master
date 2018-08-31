@@ -9,40 +9,13 @@ import com.github.jknack.handlebars.Helper;
 import com.github.jknack.handlebars.Options;
 import com.github.jknack.handlebars.Template;
 
-import banana.core.ExpandHandlebars;
+import banana.core.context.ExpandHandlebars;
 import banana.core.modle.ContextModle;
 
 public class BasicContext extends HashMap<String,Object> implements ContextModle{
 	
-	private static final ExpandHandlebars handlebars = new ExpandHandlebars();
+	private final ExpandHandlebars handlebars = new ExpandHandlebars();
 	
-	static{
-		handlebars.registerHelper("existKey", new Helper<Object>() {
-
-			public Object apply(Object context, Options options) throws IOException {
-				String path = options.param(0);
-				BasicContext basicContext = (BasicContext) options.context.model();
-				return basicContext.existPath(path);
-			}
-		});
-		handlebars.registerHelper("notEmpty", new Helper<Object>() {
-
-			public Object apply(Object context, Options options) throws IOException {
-				String path = options.param(0);
-				BasicContext basicContext = (BasicContext) options.context.model();
-				return basicContext.existPath(path);
-			}
-		});
-		handlebars.registerHelper("isEmpty", new Helper<Object>() {
-
-			public Object apply(Object context, Options options) throws IOException {
-				String path = options.param(0);
-				BasicContext basicContext = (BasicContext) options.context.model();
-				return !basicContext.existPath(path);
-			}
-		});
-	}
-
 	@Override
 	public Object parseObject(String line) throws IOException {
 		if (line.startsWith("{{") && line.endsWith("}}") && !line.contains(" ")){
@@ -86,6 +59,11 @@ public class BasicContext extends HashMap<String,Object> implements ContextModle
 			return !value.equals("");
 		}
 		return false;
+	}
+
+	@Override
+	public void registerHelper(String name, Helper<Object> helper) {
+		handlebars.registerHelper(name, helper);
 	}
 
 }

@@ -11,10 +11,11 @@ import java.util.Map;
 import java.util.Set;
 
 import com.alibaba.fastjson.JSON;
+import com.github.jknack.handlebars.Helper;
 import com.github.jknack.handlebars.Template;
 
 import banana.core.BytesWritable;
-import banana.core.ExpandHandlebars;
+import banana.core.context.ExpandHandlebars;
 import banana.core.modle.ContextModle;
 import banana.core.request.HttpRequest;
 import banana.core.request.RequestBuilder;
@@ -28,10 +29,7 @@ import banana.core.request.PageRequest.PageEncoding;
  */
 public final class TaskContextImpl extends BytesWritable implements ContextModle{
 	
-	private static final ExpandHandlebars handlebars = new ExpandHandlebars();
-	
-	static{
-	}
+	private final ExpandHandlebars handlebars = new ExpandHandlebars();
 	
 	private final BasicContext contextAttribute = new BasicContext();
 	/**
@@ -215,6 +213,11 @@ public final class TaskContextImpl extends BytesWritable implements ContextModle
 	@Override
 	public void copyTo(Map<String, Object> dst) {
 		contextAttribute.copyTo(dst);
+	}
+
+	@Override
+	public void registerHelper(String name, Helper<Object> helper) {
+		handlebars.registerHelper(name, helper);
 	}
 
 }

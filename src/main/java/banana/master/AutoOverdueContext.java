@@ -12,17 +12,15 @@ import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import com.github.jknack.handlebars.Helper;
 import com.github.jknack.handlebars.Template;
 
-import banana.core.ExpandHandlebars;
+import banana.core.context.ExpandHandlebars;
 import banana.core.modle.ContextModle;
 
 public class AutoOverdueContext implements ContextModle {
 	
-	private static final ExpandHandlebars handlebars = new ExpandHandlebars();
-	
-	static{
-	}
+	private final ExpandHandlebars handlebars = new ExpandHandlebars();
 	
 	private LinkedList<ContextModle> allContextModle ;
 	
@@ -198,6 +196,13 @@ public class AutoOverdueContext implements ContextModle {
 		while(iter.hasNext()){
 			iter.next().copyTo(dst);
 		}
+	}
+
+
+
+	@Override
+	public void registerHelper(String name, Helper<Object> helper) {
+		handlebars.registerHelper(name, helper);
 	}
 	
 }

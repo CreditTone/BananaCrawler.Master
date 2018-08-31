@@ -184,6 +184,9 @@ public final class MasterServer implements MasterProtocol {
 	public HttpRequest pollTaskRequest(String taskId) {
 		TaskTracker task = taskManager.getTaskTrackerById(taskId);
 		try {
+			if (task == null) {
+				throw new NullPointerException();
+			}
 			return task.pollRequest();
 		} catch (Exception e) {
 			logger.warn("System error", e);
@@ -218,10 +221,18 @@ public final class MasterServer implements MasterProtocol {
 			taskManager.addPreparedTask(config);
 			logger.info("prepared task " + config.name);
 		}else{
-			taskManager.verify(config);
 			TaskTracker tracker = new TaskTracker(config);
-			taskManager.addTaskTracker(tracker);
-			tracker.start();
+			try {
+				taskManager.verify(config);
+				tracker.start();
+				taskManager.addTaskTracker(tracker);
+			}catch(Exception e) {
+				e.printStackTrace();
+				logger.warn("启动失败");
+				if (tracker != null) {
+					tracker.destoryTask();
+				}
+			}
 			return new CommandResponse(true, tracker.getId());
 		}
 		return new CommandResponse(true);

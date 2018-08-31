@@ -16,7 +16,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.DBCursor;
 import com.mongodb.DBObject;
 
-import banana.core.ExpandHandlebars;
+import banana.core.context.ExpandHandlebars;
 import banana.core.request.HttpRequest;
 import banana.core.request.HttpRequest.Method;
 import banana.core.request.RequestBuilder;
