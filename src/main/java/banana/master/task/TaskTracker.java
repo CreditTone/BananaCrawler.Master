@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -207,7 +206,7 @@ public class TaskTracker {
 		}
 	}
 	
-	private void initQueue(Map<String,Object> queuecfg){
+	private void initQueue(Map<String,Object> queuecfg) {
 		int delay = 0;
 		boolean suportPriority = false;
 		if (queuecfg.containsKey("delay")){
@@ -502,12 +501,12 @@ public class TaskTracker {
 							}
 							finishedTask = true;
 						}else{
-							if (requestQueueEmptyCount < 4) {
+							if (requestQueueEmptyCount < 12) {
 								requestQueueEmptyCount ++;
 								continue;
 							}
 							runing = false;
-							logger.info("stopTaskById "+taskId);
+							logger.info("StatusChecker stopTaskById "+taskId);
 							MasterServer.getInstance().stopTaskById(taskId);
 						}
 					}

@@ -185,7 +185,7 @@ public final class MasterServer implements MasterProtocol {
 		TaskTracker task = taskManager.getTaskTrackerById(taskId);
 		try {
 			if (task == null) {
-				throw new NullPointerException();
+				return null;
 			}
 			return task.pollRequest();
 		} catch (Exception e) {
