@@ -362,6 +362,7 @@ public final class MasterServer implements MasterProtocol {
 			taskManager.removeTaskTrackerById(taskid);
 			return new CommandResponse(true, taskid);
 		}
+		logger.warn("not found task");
 		return new CommandResponse(false, "not found task");
 	}
 

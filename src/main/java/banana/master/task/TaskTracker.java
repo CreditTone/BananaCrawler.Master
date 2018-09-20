@@ -505,7 +505,6 @@ public class TaskTracker {
 								requestQueueEmptyCount ++;
 								continue;
 							}
-							runing = false;
 							logger.info("StatusChecker stopTaskById "+taskId);
 							MasterServer.getInstance().stopTaskById(taskId);
 						}
